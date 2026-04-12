@@ -1,0 +1,24 @@
+[gd_scene load_steps=2 format=3 uid="uid://d1j848v3nn5fs"]
+
+[ext_resource type="Script" uid="uid://bwmsh4iy7iacv" path="res://scripts/player.gd" id="1_fq5b6"]
+
+[node name="Node3D" type="Node3D"]
+
+[node name="A test node" type="Node3D" parent="."]
+
+[node name="MainCamera" type="Camera3D" parent="A test node"]
+transform = Transform3D(1, 0, 0, 0, 0.866026, 0.5, 0, -0.5, 0.866026, 0, 3, 6)
+current = true
+fov = 45.0
+
+[node name="Cube" type="CSGBox3D" parent="A test node"]
+size = Vector3(2, 2, 2)
+
+[node name="Node2D" type="Node2D" parent="A test node"]
+
+[node name="Player" type="CharacterBody2D" parent="A test node"]
+script = ExtResource("1_fq5b6")
+
+[node name="Sprite2D" type="ColorRect" parent="A test node/Player"]
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="A test node/Player"]

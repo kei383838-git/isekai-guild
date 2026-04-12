@@ -1,0 +1,8 @@
+{
+  "servers": {
+    "godot": {
+      "command": "node",
+      "args": ["C:/path/to/Godot-MCP/src/index.js"]
+    }
+  }
+}
