@@ -5,3 +5,8 @@
 
 *.tmp
 *.log
+
+# ローカル専用
+.claude/
+tmp/
+tools/
