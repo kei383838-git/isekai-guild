@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="DungeonConfig" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/systems/DungeonConfig.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "forest_beginner"
+display_name = "初心者の森"
+description = "村のすぐ近くにある、新人冒険者向けの森。
+薬草が自生し、スライムなどの弱い魔物が出没する。"
+map_size = Vector2i(20, 20)
+floor_count = 3
+room_count_min = 5
+room_count_max = 7
+room_size_min = 3
+room_size_max = 5
+enemy_scenes = Array[String](["res://scenes/enemy/Enemy.tscn"])
+enemies_per_floor = 2
+item_types = Array[String](["herb"])
+items_per_floor_min = 2
+items_per_floor_max = 3
+background_color = Color(0.04, 0.1, 0.05, 1)
+floor_tile_color = Color(0.35, 0.45, 0.25, 1)
+wall_tile_color = Color(0.12, 0.18, 0.1, 1)
+difficulty = 1
+allow_return = true
+return_scene = "res://scenes/main/Village.tscn"

@@ -51,7 +51,8 @@ func _on_quest_selected(quest: QuestData) -> void:
 	detail_diff.text   = "難易度: " + stars
 	detail_type.text   = "種別: " + QuestManager.get_type_label(quest.quest_type)
 	detail_target.text = "目標: %s を %d 個/体" % [quest.target_name, quest.target_count]
-	detail_reward.text = "報酬: %dG  ／  行き先: %s" % [quest.reward_gold, quest.dungeon_name]
+	var dungeon_label: String = quest.dungeon_config.display_name if quest.dungeon_config else "未設定"
+	detail_reward.text = "報酬: %dG  ／  行き先: %s" % [quest.reward_gold, dungeon_label]
 	detail_desc.text   = quest.description
 	list_panel.hide()
 	detail_panel.show()
@@ -65,7 +66,8 @@ func _on_accept_pressed() -> void:
 func _on_depart_pressed() -> void:
 	hide()
 	board_closed.emit()
-	get_tree().change_scene_to_file(_selected.dungeon_scene)
+	# クエストごとの dungeon_config は QuestManager.active_quest 経由で Dungeon.gd が読む
+	get_tree().change_scene_to_file("res://scenes/main/Dungeon.tscn")
 
 func _on_prepare_pressed() -> void:
 	hide()

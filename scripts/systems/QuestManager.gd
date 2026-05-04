@@ -1,5 +1,7 @@
 extends Node
 
+const FOREST_BEGINNER := preload("res://data/dungeons/forest_beginner.tres")
+
 var available_quests: Array = []
 var active_quest: QuestData = null
 
@@ -16,8 +18,7 @@ func _setup_quests() -> void:
 	q1.target_name  = "薬草"
 	q1.target_count = 5
 	q1.reward_gold  = 100
-	q1.dungeon_scene = "res://scenes/main/main.tscn"
-	q1.dungeon_name  = "初心者の森"
+	q1.dungeon_config = FOREST_BEGINNER
 
 	var q2 := QuestData.new()
 	q2.id           = "slime_extermination"
@@ -28,8 +29,7 @@ func _setup_quests() -> void:
 	q2.target_name  = "スライム"
 	q2.target_count = 3
 	q2.reward_gold  = 150
-	q2.dungeon_scene = "res://scenes/main/main.tscn"
-	q2.dungeon_name  = "初心者の森"
+	q2.dungeon_config = FOREST_BEGINNER
 
 	available_quests = [q1, q2]
 

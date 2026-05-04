@@ -11,5 +11,5 @@ var quest_type: int = Type.COLLECTION
 var target_name: String = ""
 var target_count: int = 1
 var reward_gold: int = 0
-var dungeon_scene: String = "res://scenes/main/main.tscn"
-var dungeon_name: String = "初心者の森"
+# 行き先ダンジョンの設定（display_name や生成パラメータをここから引く）
+var dungeon_config: DungeonConfig = null

@@ -1,42 +1,54 @@
 extends Node
 class_name DungeonGenerator
 
-const MAP_SIZE = Vector2i(20, 20)
+# 既定値（DungeonConfig が渡されない場合のフォールバック）
+const DEFAULT_MAP_SIZE = Vector2i(20, 20)
+const DEFAULT_ROOM_COUNT_MIN = 6
+const DEFAULT_ROOM_COUNT_MAX = 8
+const DEFAULT_ROOM_SIZE_MIN = 3
+const DEFAULT_ROOM_SIZE_MAX = 5
+
 const TILE_SIZE = 64
 
-# タイル設定 (main.tscn の TileSet に合わせる)
-const SOURCE_WALL = 0  # yama2 (岩)
-const SOURCE_FLOOR = 1 # sabaku (砂)
+# タイル ID（呼び出し側の TileSet と一致させる必要がある）
+const SOURCE_WALL = 0
+const SOURCE_FLOOR = 1
 const ATLAS_POS = Vector2i(0, 0)
 
 var floor_layer: TileMapLayer
 var wall_layer: TileMapLayer
 var rooms_list: Array[Rect2i] = []
 
-func generate(f_layer: TileMapLayer, w_layer: TileMapLayer):
+func generate(f_layer: TileMapLayer, w_layer: TileMapLayer, cfg: DungeonConfig = null) -> Array:
 	floor_layer = f_layer
 	wall_layer = w_layer
 	rooms_list = []
-	
+
+	var map_size: Vector2i = cfg.map_size if cfg else DEFAULT_MAP_SIZE
+	var room_count_min: int = cfg.room_count_min if cfg else DEFAULT_ROOM_COUNT_MIN
+	var room_count_max: int = cfg.room_count_max if cfg else DEFAULT_ROOM_COUNT_MAX
+	var room_size_min: int = cfg.room_size_min if cfg else DEFAULT_ROOM_SIZE_MIN
+	var room_size_max: int = cfg.room_size_max if cfg else DEFAULT_ROOM_SIZE_MAX
+
 	floor_layer.clear()
 	wall_layer.clear()
-	
+
 	# 1. すべて壁で埋める
-	for x in range(MAP_SIZE.x):
-		for y in range(MAP_SIZE.y):
+	for x in range(map_size.x):
+		for y in range(map_size.y):
 			wall_layer.set_cell(Vector2i(x, y), SOURCE_WALL, ATLAS_POS)
-	
+
 	var floor_cells = []
-	
+
 	# 2. 部屋の生成 (目標数に達するまで試行)
-	var target_room_count = randi_range(6, 8)
+	var target_room_count = randi_range(room_count_min, room_count_max)
 	for i in range(target_room_count * 5):
 		if rooms_list.size() >= target_room_count: break
-		
-		var w = randi_range(3, 5)
-		var h = randi_range(3, 5)
-		var x = randi_range(1, MAP_SIZE.x - w - 1)
-		var y = randi_range(1, MAP_SIZE.y - h - 1)
+
+		var w = randi_range(room_size_min, room_size_max)
+		var h = randi_range(room_size_min, room_size_max)
+		var x = randi_range(1, map_size.x - w - 1)
+		var y = randi_range(1, map_size.y - h - 1)
 		
 		var new_room = Rect2i(x, y, w, h)
 		
