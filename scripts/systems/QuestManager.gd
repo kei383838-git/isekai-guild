@@ -1,11 +1,19 @@
 extends Node
 
-const FOREST_BEGINNER := preload("res://data/dungeons/forest_beginner.tres")
+# 注意: .tres のロードは preload ではなく load() に分離する。
+# preload はパース時に解決されるため、.tres にパースエラーがあると
+# QuestManager.gd ごとコンパイル失敗 → Autoload が登録されず、
+# 他スクリプトから "Identifier not found: QuestManager" になる。
+const FOREST_BEGINNER_PATH := "res://data/dungeons/forest_beginner.tres"
 
 var available_quests: Array = []
 var active_quest: QuestData = null
+var _forest_beginner: DungeonConfig = null
 
 func _ready() -> void:
+	_forest_beginner = load(FOREST_BEGINNER_PATH) as DungeonConfig
+	if _forest_beginner == null:
+		push_warning("QuestManager: %s の読み込みに失敗。" % FOREST_BEGINNER_PATH)
 	_setup_quests()
 
 func _setup_quests() -> void:
@@ -18,7 +26,7 @@ func _setup_quests() -> void:
 	q1.target_name  = "薬草"
 	q1.target_count = 5
 	q1.reward_gold  = 100
-	q1.dungeon_config = FOREST_BEGINNER
+	q1.dungeon_config = _forest_beginner
 
 	var q2 := QuestData.new()
 	q2.id           = "slime_extermination"
@@ -29,7 +37,7 @@ func _setup_quests() -> void:
 	q2.target_name  = "スライム"
 	q2.target_count = 3
 	q2.reward_gold  = 150
-	q2.dungeon_config = FOREST_BEGINNER
+	q2.dungeon_config = _forest_beginner
 
 	available_quests = [q1, q2]
 
