@@ -1,5 +1,7 @@
 extends Node2D
 
+const TILE_SIZE = 64
+
 @onready var floor_layer = $Dungeon/Floor
 @onready var wall_layer = $Dungeon/Wall
 @onready var player = $Player
@@ -22,7 +24,7 @@ func _setup_stair_visual():
 	stair_sprite = Sprite2D.new()
 	stair_sprite.texture = load("res://icon.svg")
 	stair_sprite.modulate = Color.GOLD
-	stair_sprite.scale = Vector2(0.25, 0.25)
+	stair_sprite.scale = Vector2(0.5, 0.5)  # icon.svg は 128px、TILE_SIZE=64 に合わせる
 	stair_sprite.z_index = 0
 	stair_sprite.centered = false
 	add_child(stair_sprite)
@@ -62,14 +64,16 @@ func _generate_new_floor():
 		
 		# ランダムな床に配置
 		var pos = floor_cells[randi() % floor_cells.size()]
-		item.position = Vector2(pos * 32)
+		item.position = Vector2(pos * TILE_SIZE)
 	
 	# 配置実行 (プレイヤーと敵)
 	generator.place_entities(player, new_enemies, floor_cells)
-	
+	# DungeonGenerator は player.position だけ更新するので、tile_pos も同期する
+	player.tile_pos = Vector2i(player.position / TILE_SIZE)
+
 	# 階段の配置
 	stair_pos = generator.get_stair_pos(floor_cells)
-	stair_sprite.position = Vector2(stair_pos * 32)
+	stair_sprite.position = Vector2(stair_pos * TILE_SIZE)
 	
 	LogManager.add_log("地下 %d 階に到達しました。" % current_floor)
 	
@@ -80,8 +84,7 @@ func _on_player_action_finished():
 	if is_transitioning: return
 	
 	# プレイヤーの行動が終わった直後に座標をチェック
-	var player_grid_pos = Vector2i(round(player.position.x / 32), round(player.position.y / 32))
-	if player_grid_pos == stair_pos:
+	if player.tile_pos == stair_pos:
 		_on_reach_stair()
 
 func _on_reach_stair():
