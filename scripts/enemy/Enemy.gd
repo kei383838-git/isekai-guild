@@ -72,8 +72,8 @@ func act():
 	var player_grid_pos = get_grid_pos(player.position)
 	var diff = player_grid_pos - my_grid_pos
 	
-	# 隣接（上下左右）している場合は攻撃
-	if (abs(diff.x) == 1 and diff.y == 0) or (abs(diff.y) == 1 and diff.x == 0):
+	# 隣接（8方向）している場合は攻撃
+	if abs(diff.x) <= 1 and abs(diff.y) <= 1 and diff != Vector2i.ZERO:
 		attack_player(player, Vector2(diff).sign())
 	else:
 		# 隣接していない場合はプレイヤーに近づく (4方向移動)
