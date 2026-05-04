@@ -6,9 +6,13 @@ enum Role { NONE, BLACKSMITH, WAREHOUSE, SHOP }
 @export var npc_name: String = "商人"
 
 func _ready():
-	TurnManager.connect("turn_advanced", Callable(self, "_on_turn_advanced"))
+	# 存在しない turn_advanced ではなく、適切な信号に接続するか、
+	# 必要なければコメントアウトします。
+	# TurnManager.connect("enemy_turn_started", _on_enemy_turn_started)
+	pass
 
-func _on_turn_advanced():
+func _on_enemy_turn_started():
+	# 村人の行動が必要な場合はここに記述
 	match role:
 		Role.BLACKSMITH:
 			idle_hammer_animation()
@@ -17,28 +21,26 @@ func _on_turn_advanced():
 		_:
 			random_idle_motion()
 
-	await get_tree().create_timer(0.1).timeout
-	TurnManager.advance_turn()
-
 func interact():
 	match role:
 		Role.BLACKSMITH:
 			show_dialog("ここでは武器の強化ができるぞ。")
-		Role.WAREHOUSE:
-			show_dialog("倉庫に預けたいアイテムはあるかい？")
 		Role.SHOP:
-			show_dialog("おっと、今日は特売日だよ！")
+			show_dialog("いらっしゃい！何が必要だい？")
+		Role.WAREHOUSE:
+			show_dialog("荷物を預かるよ。")
 		_:
-			show_dialog("こんにちは、" + npc_name + "です。")
-
-func idle_hammer_animation():
-	pass  # 鍛冶屋のアニメーション（仮）
-
-func check_stock_behavior():
-	pass  # 倉庫番の行動処理（仮）
-
-func random_idle_motion():
-	pass  # 一般村人の待機動作（仮）
+			show_dialog("旅の方、こんにちは。")
 
 func show_dialog(text: String):
-	print("[会話] " + text)  # とりあえず標準出力に表示（仮）
+	print("[%s]: %s" % [npc_name, text])
+
+func idle_hammer_animation():
+	print("Blacksmith is hammering...")
+
+func check_stock_behavior():
+	print("Warehouse keeper is checking stocks...")
+
+func random_idle_motion():
+	# print("Villager is looking around...")
+	pass

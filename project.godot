@@ -18,6 +18,17 @@ config/icon="res://icon.svg"
 [autoload]
 
 TurnManager="*res://scripts/systems/TurnManager.gd"
+LogManager="*res://scripts/systems/LogManager.gd"
+QuestManager="*res://scripts/systems/QuestManager.gd"
+
+[display]
+
+window/size/viewport_width=1920
+window/size/viewport_height=1080
+window/size/window_width_override=1280
+window/size/window_height_override=720
+window/stretch/mode="canvas_items"
+window/stretch/scale_mode="integer"
 
 [dotnet]
 
