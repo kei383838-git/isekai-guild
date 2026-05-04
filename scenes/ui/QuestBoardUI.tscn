@@ -1,0 +1,139 @@
+[gd_scene load_steps=2 format=3 uid="uid://cykwl6tfg44vs"]
+
+[ext_resource type="Script" path="res://scripts/ui/QuestBoardUI.gd" id="1_qbui"]
+
+[node name="QuestBoardUI" type="CanvasLayer"]
+layer = 10
+script = ExtResource("1_qbui")
+
+[node name="Overlay" type="ColorRect" parent="."]
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0, 0, 0, 0.4)
+mouse_filter = 0
+
+[node name="BoardContainer" type="Control" parent="."]
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -480.0
+offset_top = -360.0
+offset_right = 480.0
+offset_bottom = 360.0
+
+[node name="BoardBG" type="ColorRect" parent="BoardContainer"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0.42, 0.26, 0.1, 1)
+
+[node name="BoardTexture" type="TextureRect" parent="BoardContainer"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+expand_mode = 1
+stretch_mode = 6
+
+[node name="Margin" type="MarginContainer" parent="BoardContainer"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+theme_override_constants/margin_left = 60
+theme_override_constants/margin_top = 48
+theme_override_constants/margin_right = 60
+theme_override_constants/margin_bottom = 48
+
+[node name="VBox" type="VBoxContainer" parent="BoardContainer/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="TitleLabel" type="Label" parent="BoardContainer/Margin/VBox"]
+layout_mode = 2
+horizontal_alignment = 1
+text = "クエストボード"
+
+[node name="HSep0" type="HSeparator" parent="BoardContainer/Margin/VBox"]
+layout_mode = 2
+
+[node name="ListPanel" type="VBoxContainer" parent="BoardContainer/Margin/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="QuestList" type="VBoxContainer" parent="BoardContainer/Margin/VBox/ListPanel"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="CloseButton" type="Button" parent="BoardContainer/Margin/VBox/ListPanel"]
+layout_mode = 2
+text = "閉じる"
+
+[node name="DetailPanel" type="VBoxContainer" parent="BoardContainer/Margin/VBox"]
+layout_mode = 2
+visible = false
+theme_override_constants/separation = 8
+
+[node name="TitleLabel" type="Label" parent="BoardContainer/Margin/VBox/DetailPanel"]
+layout_mode = 2
+text = ""
+
+[node name="DifficultyLabel" type="Label" parent="BoardContainer/Margin/VBox/DetailPanel"]
+layout_mode = 2
+text = ""
+
+[node name="TypeLabel" type="Label" parent="BoardContainer/Margin/VBox/DetailPanel"]
+layout_mode = 2
+text = ""
+
+[node name="TargetLabel" type="Label" parent="BoardContainer/Margin/VBox/DetailPanel"]
+layout_mode = 2
+text = ""
+
+[node name="RewardLabel" type="Label" parent="BoardContainer/Margin/VBox/DetailPanel"]
+layout_mode = 2
+text = ""
+
+[node name="DescLabel" type="Label" parent="BoardContainer/Margin/VBox/DetailPanel"]
+layout_mode = 2
+autowrap_mode = 2
+text = ""
+
+[node name="HSep1" type="HSeparator" parent="BoardContainer/Margin/VBox/DetailPanel"]
+layout_mode = 2
+
+[node name="ButtonsHBox" type="HBoxContainer" parent="BoardContainer/Margin/VBox/DetailPanel"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="AcceptButton" type="Button" parent="BoardContainer/Margin/VBox/DetailPanel/ButtonsHBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "受注する"
+
+[node name="BackButton" type="Button" parent="BoardContainer/Margin/VBox/DetailPanel/ButtonsHBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "一覧に戻る"
+
+[node name="AcceptPanel" type="VBoxContainer" parent="BoardContainer/Margin/VBox"]
+layout_mode = 2
+visible = false
+theme_override_constants/separation = 16
+
+[node name="AcceptMessage" type="Label" parent="BoardContainer/Margin/VBox/AcceptPanel"]
+layout_mode = 2
+horizontal_alignment = 1
+autowrap_mode = 2
+text = ""
+
+[node name="ButtonsHBox" type="HBoxContainer" parent="BoardContainer/Margin/VBox/AcceptPanel"]
+layout_mode = 2
+alignment = 1
+theme_override_constants/separation = 16
+
+[node name="DepartButton" type="Button" parent="BoardContainer/Margin/VBox/AcceptPanel/ButtonsHBox"]
+layout_mode = 2
+custom_minimum_size = Vector2(160, 0)
+text = "すぐに出発"
+
+[node name="PrepareButton" type="Button" parent="BoardContainer/Margin/VBox/AcceptPanel/ButtonsHBox"]
+layout_mode = 2
+custom_minimum_size = Vector2(160, 0)
+text = "準備をする"
