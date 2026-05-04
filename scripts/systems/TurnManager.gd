@@ -7,6 +7,11 @@ signal turn_cycle_completed # 1ターン（自・敵）が終了したときに�
 
 var is_player_turn := true
 
+func _ready() -> void:
+	# グローバル乱数を OS 時刻でシード。Autoload なのでゲーム起動時に 1 度だけ走る。
+	# これがないと毎回同じダンジョンレイアウト・同じ敵配置になる。
+	randomize()
+
 func advance_turn():
 	if is_player_turn:
 		is_player_turn = false
