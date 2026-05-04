@@ -1,0 +1,138 @@
+[gd_scene load_steps=5 format=3 uid="uid://cgp1du50b3hlb"]
+
+[ext_resource type="Script" uid="uid://cp8vi82nn01x5" path="res://scripts/main/Guild.gd" id="1_guild"]
+[ext_resource type="PackedScene" uid="uid://box2u8ur0eh8q" path="res://scenes/Player/Player.tscn" id="2_player"]
+[ext_resource type="PackedScene" uid="uid://75fd8mliijcb" path="res://scenes/ui/HUD.tscn" id="3_hud"]
+[ext_resource type="PackedScene" path="res://scenes/ui/QuestBoardUI.tscn" id="4_qbui"]
+
+[node name="Guild" type="Node2D"]
+script = ExtResource("1_guild")
+
+[node name="Floor" type="ColorRect" parent="."]
+offset_right = 640.0
+offset_bottom = 512.0
+color = Color(0.6, 0.44, 0.26, 1)
+
+[node name="WallBack" type="ColorRect" parent="."]
+offset_right = 640.0
+offset_bottom = 32.0
+color = Color(0.25, 0.15, 0.08, 1)
+
+[node name="WallLeft" type="ColorRect" parent="."]
+offset_right = 32.0
+offset_bottom = 512.0
+color = Color(0.25, 0.15, 0.08, 1)
+
+[node name="WallRight" type="ColorRect" parent="."]
+offset_left = 608.0
+offset_right = 640.0
+offset_bottom = 512.0
+color = Color(0.25, 0.15, 0.08, 1)
+
+[node name="QuestBoard" type="Node2D" parent="."]
+position = Vector2(320, 64)
+
+[node name="BoardRect" type="ColorRect" parent="QuestBoard"]
+offset_left = -112.0
+offset_top = -28.0
+offset_right = 112.0
+offset_bottom = -2.0
+color = Color(0.5, 0.32, 0.1, 1)
+
+[node name="BoardLabel" type="Label" parent="QuestBoard"]
+offset_left = -32.0
+offset_top = -33.0
+offset_right = 53.0
+offset_bottom = -10.0
+text = "クエストボード"
+
+[node name="Counter" type="ColorRect" parent="."]
+offset_left = 129.0
+offset_top = 192.0
+offset_right = 192.0
+offset_bottom = 381.0
+color = Color(0.32, 0.18, 0.07, 1)
+
+[node name="CounterLabel" type="Label" parent="."]
+offset_left = 48.0
+offset_top = 196.0
+text = "受付カウンター"
+
+[node name="Receptionist" type="Node2D" parent="."]
+position = Vector2(92, 286)
+
+[node name="Body" type="ColorRect" parent="Receptionist"]
+offset_left = -15.0
+offset_top = -16.0
+offset_right = 17.0
+offset_bottom = 16.0
+color = Color(0.8, 0.6, 0.82, 1)
+
+[node name="NameLabel" type="Label" parent="Receptionist"]
+offset_left = -21.0
+offset_top = 20.0
+offset_right = 27.0
+offset_bottom = 43.0
+text = "受付嬢"
+
+[node name="Table1" type="Node2D" parent="."]
+position = Vector2(448, 242)
+
+[node name="TableRect" type="ColorRect" parent="Table1"]
+offset_left = -48.0
+offset_top = -23.0
+offset_right = 48.0
+offset_bottom = 17.0
+color = Color(0.4, 0.26, 0.12, 1)
+
+[node name="TableLabel" type="Label" parent="Table1"]
+offset_left = -23.0
+offset_top = -16.0
+offset_right = 24.0
+offset_bottom = 7.0
+text = "テーブル"
+
+[node name="Table2" type="Node2D" parent="."]
+position = Vector2(448, 320)
+
+[node name="TableRect" type="ColorRect" parent="Table2"]
+offset_left = -48.0
+offset_top = -20.0
+offset_right = 48.0
+offset_bottom = 20.0
+color = Color(0.4, 0.26, 0.12, 1)
+
+[node name="TableLabel" type="Label" parent="Table2"]
+offset_left = -24.0
+offset_top = -10.0
+text = "テーブル"
+
+[node name="Stairs2F" type="Node2D" parent="."]
+position = Vector2(576, 192)
+
+[node name="StairRect" type="ColorRect" parent="Stairs2F"]
+offset_left = -28.0
+offset_top = -161.0
+offset_right = 28.0
+offset_bottom = 80.0
+color = Color(0.55, 0.42, 0.22, 1)
+
+[node name="StairLabel" type="Label" parent="Stairs2F"]
+offset_left = -20.0
+offset_top = -72.0
+text = "2F"
+
+[node name="GuildExit" type="Node2D" parent="."]
+position = Vector2(320, 448)
+
+[node name="ExitLabel" type="Label" parent="GuildExit"]
+offset_left = -40.0
+offset_top = -20.0
+text = "出口（村へ）"
+
+[node name="Player" parent="." instance=ExtResource("2_player")]
+position = Vector2(320, 384)
+
+[node name="HUD" parent="." instance=ExtResource("3_hud")]
+
+[node name="QuestBoardUI" parent="." instance=ExtResource("4_qbui")]
