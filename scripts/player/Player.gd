@@ -34,6 +34,7 @@ var max_sp: int = 100
 var inventory: Dictionary = {}
 var hunger: int = 100
 var max_hunger: int = 100
+var attack_power: int = 8  # 戦士の暫定基本攻撃力
 
 @onready var sprite: Sprite2D = $Sprite2D
 @onready var arrow_indicator = $ArrowIndicator
@@ -61,6 +62,11 @@ func _register_input_actions() -> void:
 		var ev := InputEventKey.new()
 		ev.keycode = KEY_C
 		InputMap.action_add_event("turn", ev)
+	if not InputMap.has_action("attack"):
+		InputMap.add_action("attack")
+		var ev := InputEventKey.new()
+		ev.keycode = KEY_SPACE
+		InputMap.action_add_event("attack", ev)
 
 func _process(_delta: float) -> void:
 	var new_mode: Mode
@@ -103,6 +109,44 @@ func wait_in_place() -> void:
 	_step = (_step + 1) % 2
 	sprite.frame_coords = Vector2i(_step * 2, facing)
 	get_tree().create_timer(0.3).timeout.connect(_show_idle, CONNECT_ONE_SHOT)
+
+# facing 定数を Vector2i に変換する（_update_facing の逆）
+func _facing_to_vector() -> Vector2i:
+	match facing:
+		DIR_DOWN:  return Vector2i(0, 1)
+		DIR_UP:    return Vector2i(0, -1)
+		DIR_LEFT:  return Vector2i(-1, 0)
+		DIR_RIGHT: return Vector2i(1, 0)
+		DIR_LT:    return Vector2i(-1, -1)
+		DIR_LB:    return Vector2i(-1, 1)
+		DIR_RT:    return Vector2i(1, -1)
+		DIR_RB:    return Vector2i(1, 1)
+	return Vector2i.ZERO
+
+func _find_enemy_at_tile(tile: Vector2i):
+	for enemy in get_tree().get_nodes_in_group("enemies"):
+		if not is_instance_valid(enemy):
+			continue
+		var e_tile := Vector2i(round(enemy.position.x / TILE_SIZE), round(enemy.position.y / TILE_SIZE))
+		if e_tile == tile:
+			return enemy
+	return null
+
+# 通常攻撃。向き先 1 マスを攻撃する。空振りでもターンは消費する。
+func attack() -> void:
+	var dir := _facing_to_vector()
+	var target_tile := tile_pos + dir
+	var target = _find_enemy_at_tile(target_tile)
+
+	# 攻撃モーション（暫定：歩行ストライドの絵を流用）
+	_step = (_step + 1) % 2
+	sprite.frame_coords = Vector2i(_step * 2, facing)
+	get_tree().create_timer(0.3).timeout.connect(_show_idle, CONNECT_ONE_SHOT)
+
+	if target and target.has_method("take_damage"):
+		target.take_damage(attack_power)
+	else:
+		LogManager.add_log("空振り。")
 
 func take_damage(amount: int) -> void:
 	hp = max(0, hp - amount)
@@ -167,6 +211,11 @@ func _unhandled_input(event: InputEvent) -> void:
 
 	if event.is_action_pressed("wait"):
 		wait_in_place()
+		TurnManager.advance_turn()
+		return
+
+	if event.is_action_pressed("attack"):
+		attack()
 		TurnManager.advance_turn()
 		return
 
