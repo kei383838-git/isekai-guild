@@ -76,7 +76,7 @@ func act():
 	if abs(diff.x) <= 1 and abs(diff.y) <= 1 and diff != Vector2i.ZERO:
 		attack_player(player, Vector2(diff).sign())
 	else:
-		# 隣接していない場合はプレイヤーに近づく (4方向移動)
+		# 隣接していない場合はプレイヤーに近づく（8方向移動）
 		move_towards_player(player_grid_pos)
 
 func attack_player(player, direction: Vector2):
@@ -87,19 +87,32 @@ func attack_player(player, direction: Vector2):
 func move_towards_player(target_grid_pos: Vector2i):
 	var my_grid_pos = get_grid_pos(position)
 	var diff = target_grid_pos - my_grid_pos
-	
-	var move_dir = Vector2.ZERO
-	# X軸かY軸、距離が遠い方を優先して近づく
-	if abs(diff.x) > abs(diff.y):
-		move_dir.x = sign(diff.x)
-	else:
-		move_dir.y = sign(diff.y)
-	
-	if move_dir != Vector2.ZERO:
-		update_sprite_direction(move_dir)
+
+	# 最短：x/y 両軸の符号を取った 8 方向ベクトル。
+	# 例: diff=(3,2) → (1,1) で斜め接近、diff=(3,0) → (1,0) で軸接近。
+	var optimal := Vector2(sign(diff.x), sign(diff.y))
+
+	# 斜めが壁等で塞がれていた場合のフォールバック候補（水平→垂直）。
+	var candidates: Array = []
+	if optimal != Vector2.ZERO:
+		candidates.append(optimal)
+	var horizontal := Vector2(sign(diff.x), 0)
+	if horizontal != Vector2.ZERO and not candidates.has(horizontal):
+		candidates.append(horizontal)
+	var vertical := Vector2(0, sign(diff.y))
+	if vertical != Vector2.ZERO and not candidates.has(vertical):
+		candidates.append(vertical)
+
+	for move_dir in candidates:
 		if can_move(move_dir):
+			update_sprite_direction(move_dir)
 			position += move_dir * TILE_SIZE
 			print("Enemy moved to: ", get_grid_pos(position))
+			return
+
+	# どこにも動けない場合でも、向きだけはプレイヤー方向に揃える
+	if optimal != Vector2.ZERO:
+		update_sprite_direction(optimal)
 
 var is_dead := false
 
