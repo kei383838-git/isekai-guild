@@ -130,5 +130,14 @@ func _get_random_pos_in_room(rect: Rect2i) -> Vector2i:
 	)
 
 func get_stair_pos(floor_cells: Array) -> Vector2i:
-	if floor_cells.is_empty(): return Vector2i.ZERO
+	# 階段は通路ではなく部屋の中にだけ配置する
+	if not rooms_list.is_empty():
+		var room: Rect2i = rooms_list[randi() % rooms_list.size()]
+		return Vector2i(
+			randi_range(room.position.x, room.end.x - 1),
+			randi_range(room.position.y, room.end.y - 1)
+		)
+	# フォールバック: 部屋が無い異常系では床セルから拾う
+	if floor_cells.is_empty():
+		return Vector2i.ZERO
 	return floor_cells[randi() % floor_cells.size()]
