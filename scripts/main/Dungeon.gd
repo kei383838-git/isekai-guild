@@ -15,6 +15,7 @@ const FALLBACK_CONFIG_PATH = "res://data/dungeons/forest_beginner.tres"
 @onready var wall_layer: TileMapLayer = $Wall
 @onready var background: ColorRect = $Background
 @onready var player = $Player
+@onready var map_view = $MapView
 
 var config: DungeonConfig
 var generator := DungeonGenerator.new()
@@ -24,12 +25,20 @@ var stair_sprite: Sprite2D
 var is_transitioning := false
 
 func _ready() -> void:
+	_register_input_actions()
 	config = _resolve_config()
 	_apply_appearance()
 	_setup_stair_visual()
 	_generate_new_floor()
 
 	TurnManager.enemy_turn_started.connect(_on_player_action_finished)
+
+func _register_input_actions() -> void:
+	if not InputMap.has_action("toggle_map"):
+		InputMap.add_action("toggle_map")
+		var ev := InputEventKey.new()
+		ev.keycode = KEY_M
+		InputMap.action_add_event("toggle_map", ev)
 
 func _resolve_config() -> DungeonConfig:
 	# 通常はクエスト受注で active_quest.dungeon_config が入っている
@@ -130,6 +139,11 @@ func _generate_new_floor() -> void:
 
 	LogManager.add_log("%s 第 %d 階に到達。" % [config.display_name, current_floor])
 
+	# マップビューに最新データを渡す
+	if map_view:
+		map_view.refresh(floor_layer, stair_pos, config.map_size,
+			"%s F%d" % [config.display_name, current_floor])
+
 	get_tree().create_timer(0.5).timeout.connect(func(): is_transitioning = false)
 
 func _on_player_action_finished() -> void:
@@ -151,6 +165,10 @@ func _on_reach_stair() -> void:
 	call_deferred("_generate_new_floor")
 
 func _unhandled_input(event: InputEvent) -> void:
+	# M でマップ表示の開閉
+	if event.is_action_pressed("toggle_map"):
+		map_view.toggle()
+		return
 	# ESC で帰還（通常ダンジョンのみ）
 	if event.is_action_pressed("ui_cancel") and config.allow_return:
 		_return_to_base()
