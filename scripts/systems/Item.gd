@@ -7,6 +7,14 @@ class_name Item
 
 @onready var sprite = get_node_or_null("Sprite2D")
 
+# アイテムキーから表示名を引く。Player のログや HUD の所持品表示で共通利用する。
+# 未登録のキーはそのまま返す（ローカライズ未整備時のフォールバック）。
+static func label_for(item_type_key: String) -> String:
+	match item_type_key:
+		"herb": return "薬草"
+		"gold": return "ゴールド"
+	return item_type_key
+
 func _ready():
 	add_to_group("items")
 	# 簡易的な見た目設定 (Sprite2D が存在する場合のみ)

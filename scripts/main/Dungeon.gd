@@ -132,6 +132,9 @@ func _generate_new_floor() -> void:
 	generator.place_entities(player, new_enemies, floor_cells)
 	# DungeonGenerator は player.position だけ更新するので tile_pos も同期する
 	player.tile_pos = Vector2i(player.position / TILE_SIZE)
+	# 配置位置にアイテムが重なっていれば拾わせる
+	if player.has_method("try_pickup"):
+		player.try_pickup()
 
 	# 階段配置
 	stair_pos = generator.get_stair_pos(floor_cells)

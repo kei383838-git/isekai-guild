@@ -38,7 +38,7 @@ func _on_inventory_changed(inv: Dictionary):
 		else:
 			var parts: Array = []
 			for type in inv:
-				parts.append("%s: %d" % [type, inv[type]])
+				parts.append("%s: %d" % [Item.label_for(type), inv[type]])
 			inventory_label.text = "所持品: " + ", ".join(parts)
 
 func _on_player_stats_changed(hp, max_hp, sp, max_sp):

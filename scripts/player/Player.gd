@@ -103,7 +103,30 @@ func move(direction: Vector2i) -> void:
 	sprite.frame_coords = Vector2i(_step * 2, facing)
 	tile_pos += direction
 	position = tile_to_world(tile_pos)
+	try_pickup()
 	get_tree().create_timer(0.3).timeout.connect(_show_idle, CONNECT_ONE_SHOT)
+
+# 現在 tile_pos と同じマスにあるアイテムを 1 つ拾う。
+# move() の末尾と、ダンジョン入場時の湧き同マスケースで呼ばれる。
+func try_pickup() -> void:
+	for item in get_tree().get_nodes_in_group("items"):
+		if not is_instance_valid(item):
+			continue
+		var i_tile := Vector2i(round(item.position.x / TILE_SIZE), round(item.position.y / TILE_SIZE))
+		if i_tile == tile_pos:
+			_pickup_item(item)
+			return  # 1 マスに複数アイテムは想定しない
+
+func _pickup_item(item) -> void:
+	var key: String = item.item_type
+	var amt: int = item.amount
+	if inventory.has(key):
+		inventory[key] += amt
+	else:
+		inventory[key] = amt
+	inventory_changed.emit(inventory)
+	LogManager.add_log("%s を %d 個 拾った。" % [Item.label_for(key), amt])
+	item.queue_free()
 
 func wait_in_place() -> void:
 	_step = (_step + 1) % 2
