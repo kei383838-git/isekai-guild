@@ -68,6 +68,7 @@ func generate(f_layer: TileMapLayer, w_layer: TileMapLayer, cfg: DungeonConfig =
 			for ry in range(new_room.position.y, new_room.end.y):
 				var pos = Vector2i(rx, ry)
 				floor_layer.set_cell(pos, SOURCE_FLOOR, ATLAS_POS)
+				wall_layer.erase_cell(pos)  # 床の上に壁を残さない
 				if not floor_cells.has(pos):
 					floor_cells.append(pos)
 		
@@ -92,13 +93,15 @@ func _create_corridor(start: Vector2i, end: Vector2i, floor_cells: Array):
 	for x in range(x_start, x_end + 1):
 		var pos = Vector2i(x, start.y)
 		floor_layer.set_cell(pos, SOURCE_FLOOR, ATLAS_POS)
+		wall_layer.erase_cell(pos)
 		if not floor_cells.has(pos): floor_cells.append(pos)
-		
+
 	var y_start = min(start.y, end.y)
 	var y_end = max(start.y, end.y)
 	for y in range(y_start, y_end + 1):
 		var pos = Vector2i(end.x, y)
 		floor_layer.set_cell(pos, SOURCE_FLOOR, ATLAS_POS)
+		wall_layer.erase_cell(pos)
 		if not floor_cells.has(pos): floor_cells.append(pos)
 
 func place_entities(player: Node2D, enemies: Array, _floor_cells: Array):

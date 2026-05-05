@@ -154,7 +154,20 @@ func take_damage(amount: int) -> void:
 	if hp == 0:
 		print("Player died!")
 
-func can_move(_target: Vector2i) -> bool:
+func can_move(target: Vector2i) -> bool:
+	# floor_layer が無い場面（村など）は通行制限なし
+	if floor_layer == null:
+		return true
+	# 床がない（壁・空セル）には進めない
+	if floor_layer.get_cell_source_id(target) == -1:
+		return false
+	# 敵がいるマスには進めない（攻撃は Space で別途）
+	for enemy in get_tree().get_nodes_in_group("enemies"):
+		if not is_instance_valid(enemy):
+			continue
+		var e_tile := Vector2i(round(enemy.position.x / TILE_SIZE), round(enemy.position.y / TILE_SIZE))
+		if e_tile == target:
+			return false
 	return true
 
 func _dash(direction: Vector2i) -> void:
@@ -235,6 +248,10 @@ func _unhandled_input(event: InputEvent) -> void:
 	if direction != Vector2i.ZERO:
 		if Input.is_action_pressed("dash"):
 			_dash(direction)
-		else:
+		elif can_move(tile_pos + direction):
 			move(direction)
 			TurnManager.advance_turn()
+		else:
+			# 壁・敵にぶつかった時は向きだけ更新してターンは消費しない
+			_update_facing(direction)
+			_show_idle()
