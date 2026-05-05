@@ -1,8 +1,8 @@
 extends CharacterBody2D
 
 signal stats_changed(hp: int, max_hp: int, sp: int, max_sp: int)
-signal inventory_changed(inv: Dictionary)
 signal hunger_changed(hunger: int, max_hunger: int)
+# inventory_changed は PlayerData (autoload) 側に移管
 
 const TILE_SIZE: int = 64
 const DASH_MAX_STEPS := 20
@@ -31,10 +31,10 @@ var hp: int = 30
 var max_hp: int = 30
 var sp: int = 50
 var max_sp: int = 100
-var inventory: Dictionary = {}
 var hunger: int = 100
 var max_hunger: int = 100
 var attack_power: int = 8  # 戦士の暫定基本攻撃力
+# 持ち物は PlayerData (autoload) を介して読み書きする
 
 @onready var sprite: Sprite2D = $Sprite2D
 @onready var arrow_indicator = $ArrowIndicator
@@ -120,11 +120,8 @@ func try_pickup() -> void:
 func _pickup_item(item) -> void:
 	var key: String = item.item_type
 	var amt: int = item.amount
-	if inventory.has(key):
-		inventory[key] += amt
-	else:
-		inventory[key] = amt
-	inventory_changed.emit(inventory)
+	# 持ち物の永続化は PlayerData が担当（シーン跨ぎで保持）
+	PlayerData.add_item(key, amt)
 	LogManager.add_log("%s を %d 個 拾った。" % [Item.label_for(key), amt])
 	# 採取系クエストの進捗に反映
 	QuestManager.report_pickup(key, amt)
@@ -179,7 +176,18 @@ func take_damage(amount: int) -> void:
 	if hp == 0:
 		print("Player died!")
 
+func _is_blocked_by_prop(target: Vector2i) -> bool:
+	for prop in get_tree().get_nodes_in_group("blocking_props"):
+		if not is_instance_valid(prop):
+			continue
+		var prop_tile := Vector2i(round(prop.position.x / TILE_SIZE), round(prop.position.y / TILE_SIZE))
+		if prop_tile == target:
+			return true
+	return false
+
 func can_move(target: Vector2i) -> bool:
+	if _is_blocked_by_prop(target):
+		return false
 	# floor_layer が無い場面（村など）は通行制限なし
 	if floor_layer == null:
 		return true

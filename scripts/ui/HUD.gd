@@ -28,16 +28,17 @@ func _ready():
 	QuestManager.quest_progress_changed.connect(_on_quest_progress_changed)
 	_on_gold_changed(QuestManager.gold)
 	_refresh_quest_label()
+	# PlayerData (持ち物の永続データ) の信号に接続
+	PlayerData.inventory_changed.connect(_on_inventory_changed)
+	_on_inventory_changed(PlayerData.inventory)
 
-	# プレイヤーを探して信号を接続
+	# プレイヤーを探して信号を接続（hp/sp/hunger は Player 側に残置）
 	var player = get_tree().get_first_node_in_group("player")
 	if player:
 		player.stats_changed.connect(_on_player_stats_changed)
-		player.inventory_changed.connect(_on_inventory_changed)
 		player.hunger_changed.connect(_on_hunger_changed)
 		# 初期値を反映
 		_on_player_stats_changed(player.hp, player.max_hp, player.sp, player.max_sp)
-		_on_inventory_changed(player.inventory)
 		_on_hunger_changed(player.hunger, player.max_hunger)
 
 func _on_gold_changed(g: int) -> void:
