@@ -179,5 +179,14 @@ func _unhandled_input(event: InputEvent) -> void:
 func _return_to_base() -> void:
 	var ret: String = config.return_scene if config.return_scene != "" \
 		else "res://scenes/main/Village.tscn"
+
+	# 達成済みクエストがあれば報酬を渡してクエストを解除
+	if QuestManager.is_quest_complete():
+		var reward: int = QuestManager.active_quest.reward_gold
+		var title: String = QuestManager.active_quest.title
+		QuestManager.add_gold(reward)
+		LogManager.add_log("「%s」を完遂し %d G を獲得した。" % [title, reward])
+		QuestManager.clear_active_quest()
+
 	LogManager.add_log("村へ帰還する。")
 	get_tree().change_scene_to_file(ret)

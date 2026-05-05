@@ -7,11 +7,28 @@ extends CanvasLayer
 @onready var log_label = $LogPanel/LogLabel
 @onready var inventory_label = $MarginContainer/VBoxContainer/InventoryLabel
 @onready var hunger_label = $MarginContainer/VBoxContainer/HungerLabel
+@onready var _vbox = $MarginContainer/VBoxContainer
+
+var gold_label: Label
+var quest_label: Label
 
 func _ready():
+	# 動的にゴールド・クエスト進捗ラベルを追加（HUD.tscn は触らない）
+	gold_label = Label.new()
+	gold_label.name = "GoldLabel"
+	_vbox.add_child(gold_label)
+	quest_label = Label.new()
+	quest_label.name = "QuestLabel"
+	_vbox.add_child(quest_label)
+
 	# LogManager の信号に接続
 	LogManager.log_added.connect(_on_log_added)
-	
+	# QuestManager の信号に接続
+	QuestManager.gold_changed.connect(_on_gold_changed)
+	QuestManager.quest_progress_changed.connect(_on_quest_progress_changed)
+	_on_gold_changed(QuestManager.gold)
+	_refresh_quest_label()
+
 	# プレイヤーを探して信号を接続
 	var player = get_tree().get_first_node_in_group("player")
 	if player:
@@ -22,6 +39,22 @@ func _ready():
 		_on_player_stats_changed(player.hp, player.max_hp, player.sp, player.max_sp)
 		_on_inventory_changed(player.inventory)
 		_on_hunger_changed(player.hunger, player.max_hunger)
+
+func _on_gold_changed(g: int) -> void:
+	if gold_label:
+		gold_label.text = "ゴールド: %d" % g
+
+func _on_quest_progress_changed(_progress: int, _target: int) -> void:
+	_refresh_quest_label()
+
+func _refresh_quest_label() -> void:
+	if not quest_label:
+		return
+	var q = QuestManager.active_quest
+	if q == null:
+		quest_label.text = "依頼: 未受注"
+	else:
+		quest_label.text = "依頼: %s (%d / %d)" % [q.title, QuestManager.quest_progress, q.target_count]
 
 func _on_log_added(message: String):
 	if log_label:

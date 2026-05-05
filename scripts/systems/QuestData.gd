@@ -8,7 +8,8 @@ var title: String = ""
 var description: String = ""
 var difficulty: int = 1
 var quest_type: int = Type.COLLECTION
-var target_name: String = ""
+var target_name: String = ""  # 表示用の名前（例: "薬草" / "スライム"）
+var target_key: String = ""   # マッチング用のキー（例: "herb" / "slime"）
 var target_count: int = 1
 var reward_gold: int = 0
 # 行き先ダンジョンの設定（display_name や生成パラメータをここから引く）

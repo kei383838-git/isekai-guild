@@ -126,6 +126,8 @@ func _pickup_item(item) -> void:
 		inventory[key] = amt
 	inventory_changed.emit(inventory)
 	LogManager.add_log("%s を %d 個 拾った。" % [Item.label_for(key), amt])
+	# 採取系クエストの進捗に反映
+	QuestManager.report_pickup(key, amt)
 	item.queue_free()
 
 func wait_in_place() -> void:

@@ -3,6 +3,9 @@ class_name Enemy
 
 const TILE_SIZE = 64
 
+# 種別キー（QuestData.target_key と突き合わせる）
+@export var enemy_type: String = "slime"
+
 # ステータス
 var max_hp := 30
 var hp := 30
@@ -134,9 +137,11 @@ func take_damage(amount: int):
 func die():
 	if is_dead: return
 	is_dead = true
-	
+
 	LogManager.add_log("敵を倒した！")
-	
+	# 討伐系クエストの進捗に反映
+	QuestManager.report_kill(enemy_type)
+
 	# 判定から即座に除外（次のターンの行動や移動妨害を防ぐ）
 	remove_from_group(GROUP_NAME)
 	
