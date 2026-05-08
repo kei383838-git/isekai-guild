@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://buxoooriuyttr"
-path="res://.godot/imported/forest_floor_tileset_v1_repeat_preview.png-273648527f3ae267516811b2f3b74153.ctex"
+uid="uid://8kmd7wm18bm8"
+path="res://.godot/imported/forest_wall_tileset_v2_repeat_preview.png-29aa2895f7f43b6ee881d6600e8bf95d.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/tilesets/forest_floor_tileset_v1_repeat_preview.png"
-dest_files=["res://.godot/imported/forest_floor_tileset_v1_repeat_preview.png-273648527f3ae267516811b2f3b74153.ctex"]
+source_file="res://assets/tilesets/dungeons/forest/forest_wall_tileset_v2_repeat_preview.png"
+dest_files=["res://.godot/imported/forest_wall_tileset_v2_repeat_preview.png-29aa2895f7f43b6ee881d6600e8bf95d.ctex"]
 
 [params]
 

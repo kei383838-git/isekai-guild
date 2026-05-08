@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://ctepo4ekjy11h"
-path="res://.godot/imported/enemy.png-438d8d7ff2bb184d65abffdf26208b85.ctex"
+uid="uid://co7gwkjmp03ed"
+path="res://.godot/imported/forest_wall_floor_v2_map_preview.png-de4473982a8510c62273dc9f0869923c.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/characters/enemy.png"
-dest_files=["res://.godot/imported/enemy.png-438d8d7ff2bb184d65abffdf26208b85.ctex"]
+source_file="res://assets/tilesets/dungeons/forest/forest_wall_floor_v2_map_preview.png"
+dest_files=["res://.godot/imported/forest_wall_floor_v2_map_preview.png-de4473982a8510c62273dc9f0869923c.ctex"]
 
 [params]
 

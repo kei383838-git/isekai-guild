@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://x4rpmaih0crl"
-path="res://.godot/imported/forest_wall_tileset_v2_64_preview.png-6bca0150a82b98d6ac292d3784047ea9.ctex"
+uid="uid://qklmyl6qj61m"
+path="res://.godot/imported/warrior2.png-35d26954e5183536fad26084ac7a22ca.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/tilesets/forest_wall_tileset_v2_64_preview.png"
-dest_files=["res://.godot/imported/forest_wall_tileset_v2_64_preview.png-6bca0150a82b98d6ac292d3784047ea9.ctex"]
+source_file="res://assets/characters/player/warrior2.png"
+dest_files=["res://.godot/imported/warrior2.png-35d26954e5183536fad26084ac7a22ca.ctex"]
 
 [params]
 

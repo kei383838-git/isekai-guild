@@ -2,7 +2,7 @@
 
 [ext_resource type="Texture2D" uid="uid://3f7nhv2sml0b" path="res://assets/tilesets/Road Tileset Generated 20260504_165112_64.png" id="1_y3u6v"]
 [ext_resource type="Texture2D" uid="uid://b67gtkerapl47" path="res://assets/tilesets/Road Tileset Generated 20260504_165142_64.png" id="2_cboec"]
-[ext_resource type="Texture2D" uid="uid://dsj78d3cgg1mu" path="res://assets/tilesets/forest_wall_tileset_v2_64.png" id="3_cboec"]
+[ext_resource type="Texture2D" uid="uid://dsj78d3cgg1mu" path="res://assets/tilesets/dungeons/forest/forest_wall_tileset_v2_64.png" id="3_cboec"]
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_fxl1w"]
 texture = ExtResource("1_y3u6v")

@@ -10,7 +10,7 @@ metadata={
 
 [deps]
 
-source_file="res://assets/tilesets/forest_wall_tileset_v2_64.png"
+source_file="res://assets/tilesets/dungeons/forest/forest_wall_tileset_v2_64.png"
 dest_files=["res://.godot/imported/forest_wall_tileset_v2_64.png-78c1b88f345e958c9ef3fc6d4183e518.ctex"]
 
 [params]

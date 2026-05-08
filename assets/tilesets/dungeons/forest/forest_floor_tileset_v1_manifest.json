@@ -1,7 +1,7 @@
 {
-  "asset": "res://assets/tilesets/forest_floor_tileset_v1_64.png",
-  "preview": "res://assets/tilesets/forest_floor_tileset_v1_64_preview.png",
-  "repeat_preview": "res://assets/tilesets/forest_floor_tileset_v1_repeat_preview.png",
+  "asset": "res://assets/tilesets/dungeons/forest/forest_floor_tileset_v1_64.png",
+  "preview": "res://assets/tilesets/dungeons/forest/forest_floor_tileset_v1_64_preview.png",
+  "repeat_preview": "res://assets/tilesets/dungeons/forest/forest_floor_tileset_v1_repeat_preview.png",
   "source_generated_image": "C:\\Users\\kei38\\.codex\\generated_images\\019e04f1-b692-7990-ab0f-df8ddeabc47f\\ig_04742b3506b991c10169fd6272e41c8191ba5bf297c78f7a0e.png",
   "cell_size": [
     64,
