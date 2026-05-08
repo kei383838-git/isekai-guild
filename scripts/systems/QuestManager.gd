@@ -91,9 +91,9 @@ func _advance_progress(amount: int) -> void:
 	if not was_complete and is_quest_complete():
 		LogManager.add_log("依頼達成！「%s」" % active_quest.title)
 
-# ゴールド加算（クエスト報酬・売却収入など、外部から呼ぶ）
+# ゴールド加算（負数で減算も可。下限 0 でクランプ）
 func add_gold(amount: int) -> void:
-	gold += amount
+	gold = max(0, gold + amount)
 	gold_changed.emit(gold)
 
 func get_type_label(quest_type: int) -> String:

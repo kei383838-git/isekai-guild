@@ -2,6 +2,7 @@ extends CharacterBody2D
 
 signal stats_changed(hp: int, max_hp: int, sp: int, max_sp: int)
 signal hunger_changed(hunger: int, max_hunger: int)
+signal died
 # inventory_changed は PlayerData (autoload) 側に移管
 
 const TILE_SIZE: int = 64
@@ -29,6 +30,7 @@ var in_village: bool = false
 var floor_layer: TileMapLayer = null
 var _step: int = 1
 var _is_dashing: bool = false
+var _is_dead: bool = false
 var _mode: Mode = Mode.NORMAL
 var _turns_in_dungeon: int = 0
 
@@ -141,7 +143,7 @@ func _pickup_item(item) -> void:
 # 1 ターン経過（プレイヤー＋敵 1 サイクル）ごとに呼ばれる。
 # 村では何もしない（探索中のみ満腹度・SP が変動する）。
 func _on_turn_cycle_completed() -> void:
-	if in_village:
+	if in_village or _is_dead:
 		return
 	_turns_in_dungeon += 1
 	# 10 ターンごとに満腹度 -1
@@ -197,10 +199,20 @@ func attack() -> void:
 		LogManager.add_log("空振り。")
 
 func take_damage(amount: int) -> void:
+	if _is_dead:
+		return
 	hp = max(0, hp - amount)
 	stats_changed.emit(hp, max_hp, sp, max_sp)
 	if hp == 0:
-		print("Player died!")
+		_is_dead = true
+		_play_death_effect()
+		died.emit()
+
+func _play_death_effect() -> void:
+	if sprite == null:
+		return
+	var tween := create_tween()
+	tween.tween_property(sprite, "modulate", Color(1.0, 0.3, 0.3, 0.6), 0.5)
 
 func _is_blocked_by_prop(target: Vector2i) -> bool:
 	var target_center := tile_to_world(target) + Vector2(TILE_SIZE, TILE_SIZE) * 0.5
@@ -298,7 +310,7 @@ func _get_diagonal_direction(event: InputEvent) -> Vector2i:
 	return Vector2i.ZERO
 
 func _unhandled_input(event: InputEvent) -> void:
-	if _is_dashing or not TurnManager.is_player_turn:
+	if _is_dashing or _is_dead or not TurnManager.is_player_turn:
 		return
 
 	if event.is_action_pressed("wait"):

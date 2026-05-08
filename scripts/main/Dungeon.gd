@@ -32,6 +32,8 @@ func _ready() -> void:
 	_generate_new_floor()
 
 	TurnManager.enemy_turn_started.connect(_on_player_action_finished)
+	if player.has_signal("died"):
+		player.died.connect(_on_player_died)
 
 func _register_input_actions() -> void:
 	if not InputMap.has_action("toggle_map"):
@@ -190,3 +192,51 @@ func _return_to_base() -> void:
 
 	LogManager.add_log("村へ帰還する。")
 	get_tree().change_scene_to_file(ret)
+
+# プレイヤー死亡時。ロスト処理 → クエスト失敗 → 演出後に村へ強制帰還。
+func _on_player_died() -> void:
+	if is_transitioning:
+		return
+	is_transitioning = true
+	LogManager.add_log("やられた…")
+	_apply_loot_loss()
+	if QuestManager.active_quest:
+		LogManager.add_log("依頼「%s」は失敗した。" % QuestManager.active_quest.title)
+		QuestManager.clear_active_quest()
+	# 死亡演出を見せる時間を取ってから帰還
+	get_tree().create_timer(1.5).timeout.connect(_force_return_to_village)
+
+func _force_return_to_village() -> void:
+	LogManager.add_log("村へ運ばれた…")
+	var ret: String = config.return_scene if config.return_scene != "" \
+		else "res://scenes/main/Village.tscn"
+	get_tree().change_scene_to_file(ret)
+
+# DungeonConfig.difficulty に応じた所持品・ゴールドのロスト処理。
+# 装備のロストは未実装（装備システム自体が未実装）。
+func _apply_loot_loss() -> void:
+	var rate: float = _loss_rate_for_difficulty(config.difficulty)
+	if rate <= 0.0:
+		return
+	# 所持品のロスト（割合で個数を切り詰め）
+	var keys: Array = PlayerData.inventory.keys().duplicate()
+	for key in keys:
+		var amount: int = PlayerData.inventory.get(key, 0)
+		var lost: int = int(round(amount * rate))
+		if lost > 0:
+			PlayerData.remove_item(key, lost)
+			LogManager.add_log("%s を %d 個 失った…" % [Item.label_for(key), lost])
+	# ゴールドのロスト
+	var gold_lost: int = int(round(QuestManager.gold * rate))
+	if gold_lost > 0:
+		QuestManager.add_gold(-gold_lost)
+		LogManager.add_log("%d G を失った…" % gold_lost)
+
+# 難易度（1=低／2=中／3=高）からロスト率を決める。
+# loot_loss.md：低=なし／中=30〜70%（中間値 50% を採用）／高=全ロスト。
+func _loss_rate_for_difficulty(d: int) -> float:
+	match d:
+		1: return 0.0
+		2: return 0.5
+		3: return 1.0
+	return 0.0
