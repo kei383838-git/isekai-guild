@@ -10,14 +10,20 @@ const DEFAULT_ROOM_SIZE_MAX = 5
 
 const TILE_SIZE = 64
 
-# タイル ID（呼び出し側の TileSet と一致させる必要がある）
-const SOURCE_WALL = 0
-const SOURCE_FLOOR = 1
-const ATLAS_POS = Vector2i(0, 0)
+# 既定のタイル ID（cfg 未指定時のフォールバック。旧 main.tscn の TileSet と一致）
+const DEFAULT_SOURCE_WALL = 0
+const DEFAULT_SOURCE_FLOOR = 1
+const ATLAS_POS_FALLBACK = Vector2i(0, 0)
 
 var floor_layer: TileMapLayer
 var wall_layer: TileMapLayer
 var rooms_list: Array[Rect2i] = []
+
+# generate() の中で確定し、_create_corridor 等のヘルパからも参照する。
+var _src_floor: int = DEFAULT_SOURCE_FLOOR
+var _src_wall: int = DEFAULT_SOURCE_WALL
+var _floor_atlas_coords: Array[Vector2i] = []
+var _wall_atlas_coords: Array[Vector2i] = []
 
 func generate(f_layer: TileMapLayer, w_layer: TileMapLayer, cfg: DungeonConfig = null) -> Array:
 	floor_layer = f_layer
@@ -29,6 +35,13 @@ func generate(f_layer: TileMapLayer, w_layer: TileMapLayer, cfg: DungeonConfig =
 	var room_count_max: int = cfg.room_count_max if cfg else DEFAULT_ROOM_COUNT_MAX
 	var room_size_min: int = cfg.room_size_min if cfg else DEFAULT_ROOM_SIZE_MIN
 	var room_size_max: int = cfg.room_size_max if cfg else DEFAULT_ROOM_SIZE_MAX
+	_src_floor = cfg.floor_source_id if cfg else DEFAULT_SOURCE_FLOOR
+	_src_wall = cfg.wall_source_id if cfg else DEFAULT_SOURCE_WALL
+
+	# TileSet 内のアトラス座標を集めておく。1 タイルしか無い仮置き TileSet なら 1 通り、
+	# 4x4 の本素材なら 16 通り。set_cell ごとにこの配列からランダムに 1 つ選ぶ。
+	_floor_atlas_coords = _collect_atlas_coords(floor_layer, _src_floor)
+	_wall_atlas_coords = _collect_atlas_coords(wall_layer, _src_wall)
 
 	floor_layer.clear()
 	wall_layer.clear()
@@ -36,7 +49,7 @@ func generate(f_layer: TileMapLayer, w_layer: TileMapLayer, cfg: DungeonConfig =
 	# 1. すべて壁で埋める
 	for x in range(map_size.x):
 		for y in range(map_size.y):
-			wall_layer.set_cell(Vector2i(x, y), SOURCE_WALL, ATLAS_POS)
+			wall_layer.set_cell(Vector2i(x, y), _src_wall, _random_wall_atlas())
 
 	var floor_cells = []
 
@@ -67,7 +80,7 @@ func generate(f_layer: TileMapLayer, w_layer: TileMapLayer, cfg: DungeonConfig =
 		for rx in range(new_room.position.x, new_room.end.x):
 			for ry in range(new_room.position.y, new_room.end.y):
 				var pos = Vector2i(rx, ry)
-				floor_layer.set_cell(pos, SOURCE_FLOOR, ATLAS_POS)
+				floor_layer.set_cell(pos, _src_floor, _random_floor_atlas())
 				wall_layer.erase_cell(pos)  # 床の上に壁を残さない
 				if not floor_cells.has(pos):
 					floor_cells.append(pos)
@@ -92,7 +105,7 @@ func _create_corridor(start: Vector2i, end: Vector2i, floor_cells: Array):
 	var x_end = max(start.x, end.x)
 	for x in range(x_start, x_end + 1):
 		var pos = Vector2i(x, start.y)
-		floor_layer.set_cell(pos, SOURCE_FLOOR, ATLAS_POS)
+		floor_layer.set_cell(pos, _src_floor, _random_floor_atlas())
 		wall_layer.erase_cell(pos)
 		if not floor_cells.has(pos): floor_cells.append(pos)
 
@@ -100,9 +113,32 @@ func _create_corridor(start: Vector2i, end: Vector2i, floor_cells: Array):
 	var y_end = max(start.y, end.y)
 	for y in range(y_start, y_end + 1):
 		var pos = Vector2i(end.x, y)
-		floor_layer.set_cell(pos, SOURCE_FLOOR, ATLAS_POS)
+		floor_layer.set_cell(pos, _src_floor, _random_floor_atlas())
 		wall_layer.erase_cell(pos)
 		if not floor_cells.has(pos): floor_cells.append(pos)
+
+# TileSet のソースに登録されている全アトラス座標を集める。
+func _collect_atlas_coords(layer: TileMapLayer, source_id: int) -> Array[Vector2i]:
+	var coords: Array[Vector2i] = []
+	if layer == null or layer.tile_set == null:
+		return coords
+	var src = layer.tile_set.get_source(source_id)
+	if src == null or not (src is TileSetAtlasSource):
+		return coords
+	var atlas: TileSetAtlasSource = src
+	for i in range(atlas.get_tiles_count()):
+		coords.append(atlas.get_tile_id(i))
+	return coords
+
+func _random_floor_atlas() -> Vector2i:
+	if _floor_atlas_coords.is_empty():
+		return ATLAS_POS_FALLBACK
+	return _floor_atlas_coords[randi() % _floor_atlas_coords.size()]
+
+func _random_wall_atlas() -> Vector2i:
+	if _wall_atlas_coords.is_empty():
+		return ATLAS_POS_FALLBACK
+	return _wall_atlas_coords[randi() % _wall_atlas_coords.size()]
 
 func place_entities(player: Node2D, enemies: Array, _floor_cells: Array):
 	if rooms_list.is_empty(): return

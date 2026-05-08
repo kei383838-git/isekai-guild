@@ -6,9 +6,6 @@ extends Node2D
 # 全ダンジョンで使い回す前提のシェル。
 
 const TILE_SIZE = 64
-# DungeonGenerator の hardcoded ID と一致させる
-const SOURCE_FLOOR = 1
-const SOURCE_WALL = 0
 const FALLBACK_CONFIG_PATH = "res://data/dungeons/forest_beginner.tres"
 
 @onready var floor_layer: TileMapLayer = $Floor
@@ -56,12 +53,15 @@ func _resolve_config() -> DungeonConfig:
 func _apply_appearance() -> void:
 	if background:
 		background.color = config.background_color
-	var ts := _build_placeholder_tileset(config.floor_tile_color, config.wall_tile_color)
-	floor_layer.tile_set = ts
-	wall_layer.tile_set = ts
+	# 床と壁はそれぞれ独立した TileSet を持つ。本素材があればそれを使い、
+	# 無ければ単色塗りの仮置き TileSet を実行時に組み立てる。
+	floor_layer.tile_set = config.floor_tile_set if config.floor_tile_set \
+		else _build_single_color_tileset(config.floor_tile_color, config.floor_source_id)
+	wall_layer.tile_set = config.wall_tile_set if config.wall_tile_set \
+		else _build_single_color_tileset(config.wall_tile_color, config.wall_source_id)
 
-# 単色の仮置き TileSet を実行時に組み立てる。後で本素材に差し替え可能。
-static func _build_placeholder_tileset(floor_color: Color, wall_color: Color) -> TileSet:
+# 単色 1 タイルだけの仮置き TileSet。本素材未投入のダンジョンでも見た目が成立するようにする。
+static func _build_single_color_tileset(color: Color, source_id: int) -> TileSet:
 	var ts := TileSet.new()
 	ts.tile_size = Vector2i(TILE_SIZE, TILE_SIZE)
 
@@ -69,19 +69,12 @@ static func _build_placeholder_tileset(floor_color: Color, wall_color: Color) ->
 	img.fill(Color.WHITE)
 	var tex := ImageTexture.create_from_image(img)
 
-	var src_floor := TileSetAtlasSource.new()
-	src_floor.texture = tex
-	src_floor.texture_region_size = Vector2i(TILE_SIZE, TILE_SIZE)
-	src_floor.create_tile(Vector2i(0, 0))
-	src_floor.get_tile_data(Vector2i(0, 0), 0).modulate = floor_color
-	ts.add_source(src_floor, SOURCE_FLOOR)
-
-	var src_wall := TileSetAtlasSource.new()
-	src_wall.texture = tex
-	src_wall.texture_region_size = Vector2i(TILE_SIZE, TILE_SIZE)
-	src_wall.create_tile(Vector2i(0, 0))
-	src_wall.get_tile_data(Vector2i(0, 0), 0).modulate = wall_color
-	ts.add_source(src_wall, SOURCE_WALL)
+	var src := TileSetAtlasSource.new()
+	src.texture = tex
+	src.texture_region_size = Vector2i(TILE_SIZE, TILE_SIZE)
+	src.create_tile(Vector2i(0, 0))
+	src.get_tile_data(Vector2i(0, 0), 0).modulate = color
+	ts.add_source(src, source_id)
 
 	return ts
 

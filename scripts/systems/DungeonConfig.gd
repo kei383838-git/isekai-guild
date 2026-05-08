@@ -25,7 +25,14 @@ extends Resource
 @export var items_per_floor_min: int = 2
 @export var items_per_floor_max: int = 3
 
-@export_group("見た目（仮置き用）")
+@export_group("見た目")
+# 本素材の TileSet（指定があれば仮置きの単色塗りを上書きする）
+@export var floor_tile_set: TileSet = null
+@export var wall_tile_set: TileSet = null
+# TileSet 内のソース ID（forest_*.tres は両方 1）
+@export var floor_source_id: int = 1
+@export var wall_source_id: int = 1
+# 仮置き用の色（TileSet 未指定時のみ使用）
 @export var background_color: Color = Color(0.05, 0.08, 0.05)
 @export var floor_tile_color: Color = Color(0.4, 0.35, 0.3)
 @export var wall_tile_color: Color = Color(0.1, 0.1, 0.05)

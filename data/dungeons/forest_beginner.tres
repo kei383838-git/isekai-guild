@@ -1,6 +1,8 @@
-[gd_resource type="Resource" load_steps=2 format=3]
+[gd_resource type="Resource" load_steps=4 format=3]
 
 [ext_resource type="Script" path="res://scripts/systems/DungeonConfig.gd" id="1"]
+[ext_resource type="TileSet" path="res://assets/tilesets/forest_floor_tileset_v1.tres" id="2_floor"]
+[ext_resource type="TileSet" path="res://assets/tilesets/forest_wall_tileset_v2.tres" id="3_wall"]
 
 [resource]
 script = ExtResource("1")
@@ -16,6 +18,10 @@ room_size_max = 5
 enemies_per_floor = 2
 items_per_floor_min = 2
 items_per_floor_max = 3
+floor_tile_set = ExtResource("2_floor")
+wall_tile_set = ExtResource("3_wall")
+floor_source_id = 1
+wall_source_id = 1
 background_color = Color(0.04, 0.1, 0.05, 1)
 floor_tile_color = Color(0.35, 0.45, 0.25, 1)
 wall_tile_color = Color(0.12, 0.18, 0.1, 1)
