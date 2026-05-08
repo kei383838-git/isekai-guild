@@ -24,12 +24,10 @@ PlayerData="*res://scripts/systems/PlayerData.gd"
 
 [display]
 
-window/size/viewport_width=1920
-window/size/viewport_height=1080
-window/size/window_width_override=1280
-window/size/window_height_override=720
+window/size/viewport_width=1280
+window/size/viewport_height=720
 window/stretch/mode="canvas_items"
-window/stretch/scale_mode="fractional"
+window/stretch/scale_mode="integer"
 
 [dotnet]
 
@@ -38,10 +36,6 @@ project/assembly_name="異世界の不思議な冒険ギルド"
 [editor_plugins]
 
 enabled=PackedStringArray("res://addons/godot_mcp/plugin.cfg")
-
-[gui]
-
-theme/default_font_size=24
 
 [rendering]
 
