@@ -7,6 +7,10 @@ signal hunger_changed(hunger: int, max_hunger: int)
 const TILE_SIZE: int = 64
 const DASH_MAX_STEPS := 20
 
+# リソース変動の周期（ターン）
+const HUNGER_TICK_INTERVAL := 10  # 10 ターンごとに満腹度 -1
+const SP_RECOVER_INTERVAL := 5    # 5 ターンごとに SP +1
+
 # スプライトシート行（8方向）
 const DIR_DOWN  = 0
 const DIR_LB    = 1  # 左下
@@ -26,6 +30,7 @@ var floor_layer: TileMapLayer = null
 var _step: int = 1
 var _is_dashing: bool = false
 var _mode: Mode = Mode.NORMAL
+var _turns_in_dungeon: int = 0
 
 var hp: int = 30
 var max_hp: int = 30
@@ -45,6 +50,8 @@ func _ready() -> void:
 	tile_pos = Vector2i(position / TILE_SIZE)
 	position = tile_to_world(tile_pos)
 	_show_idle()
+	# ターン経過によるリソース変化（満腹度・SP）を購読
+	TurnManager.turn_cycle_completed.connect(_on_turn_cycle_completed)
 
 func _register_input_actions() -> void:
 	if not InputMap.has_action("wait"):
@@ -104,6 +111,10 @@ func move(direction: Vector2i) -> void:
 	tile_pos += direction
 	position = tile_to_world(tile_pos)
 	try_pickup()
+	# 満腹度 0 で移動すると 1 歩 1 HP 減（攻撃・スキル等では発生しない）
+	if not in_village and hunger == 0:
+		take_damage(1)
+		LogManager.add_log("空腹で 1 ダメージ。")
 	get_tree().create_timer(0.3).timeout.connect(_show_idle, CONNECT_ONE_SHOT)
 
 # 現在 tile_pos と同じマスにあるアイテムを 1 つ拾う。
@@ -126,6 +137,21 @@ func _pickup_item(item) -> void:
 	# 採取系クエストの進捗に反映
 	QuestManager.report_pickup(key, amt)
 	item.queue_free()
+
+# 1 ターン経過（プレイヤー＋敵 1 サイクル）ごとに呼ばれる。
+# 村では何もしない（探索中のみ満腹度・SP が変動する）。
+func _on_turn_cycle_completed() -> void:
+	if in_village:
+		return
+	_turns_in_dungeon += 1
+	# 10 ターンごとに満腹度 -1
+	if _turns_in_dungeon % HUNGER_TICK_INTERVAL == 0 and hunger > 0:
+		hunger -= 1
+		hunger_changed.emit(hunger, max_hunger)
+	# 5 ターンごとに SP +1（上限まで）
+	if _turns_in_dungeon % SP_RECOVER_INTERVAL == 0 and sp < max_sp:
+		sp += 1
+		stats_changed.emit(hp, max_hp, sp, max_sp)
 
 func wait_in_place() -> void:
 	_step = (_step + 1) % 2
@@ -177,8 +203,28 @@ func take_damage(amount: int) -> void:
 		print("Player died!")
 
 func _is_blocked_by_prop(target: Vector2i) -> bool:
+	var target_center := tile_to_world(target) + Vector2(TILE_SIZE, TILE_SIZE) * 0.5
 	for prop in get_tree().get_nodes_in_group("blocking_props"):
 		if not is_instance_valid(prop):
+			continue
+		var has_shape := false
+		for child in prop.find_children("*", "CollisionShape2D", true, false):
+			var shape_node := child as CollisionShape2D
+			if shape_node == null:
+				continue
+			if shape_node.disabled:
+				continue
+			var rect_shape := shape_node.shape as RectangleShape2D
+			if rect_shape == null:
+				continue
+			has_shape = true
+			var shape_scale := Vector2(abs(shape_node.global_scale.x), abs(shape_node.global_scale.y))
+			var half_size := rect_shape.size * shape_scale * 0.5
+			var center: Vector2 = shape_node.global_position
+			if target_center.x >= center.x - half_size.x and target_center.x <= center.x + half_size.x:
+				if target_center.y >= center.y - half_size.y and target_center.y <= center.y + half_size.y:
+					return true
+		if has_shape:
 			continue
 		var prop_tile := Vector2i(round(prop.position.x / TILE_SIZE), round(prop.position.y / TILE_SIZE))
 		if prop_tile == target:
