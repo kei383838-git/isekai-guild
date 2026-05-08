@@ -1,7 +1,8 @@
-[gd_resource type="TileSet" load_steps=5 format=3 uid="uid://dwv1tvqojy2k3"]
+[gd_resource type="TileSet" load_steps=7 format=3 uid="uid://dwv1tvqojy2k3"]
 
 [ext_resource type="Texture2D" uid="uid://3f7nhv2sml0b" path="res://assets/tilesets/Road Tileset Generated 20260504_165112_64.png" id="1_y3u6v"]
 [ext_resource type="Texture2D" uid="uid://b67gtkerapl47" path="res://assets/tilesets/Road Tileset Generated 20260504_165142_64.png" id="2_cboec"]
+[ext_resource type="Texture2D" uid="uid://dsj78d3cgg1mu" path="res://assets/tilesets/forest_wall_tileset_v2_64.png" id="3_cboec"]
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_fxl1w"]
 texture = ExtResource("1_y3u6v")
@@ -107,7 +108,28 @@ texture_region_size = Vector2i(64, 64)
 6:5/0 = 0
 7:5/0 = 0
 
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_cboec"]
+texture = ExtResource("3_cboec")
+texture_region_size = Vector2i(64, 64)
+0:0/0 = 0
+1:0/0 = 0
+2:0/0 = 0
+3:0/0 = 0
+0:1/0 = 0
+1:1/0 = 0
+2:1/0 = 0
+3:1/0 = 0
+0:2/0 = 0
+1:2/0 = 0
+2:2/0 = 0
+3:2/0 = 0
+0:3/0 = 0
+1:3/0 = 0
+2:3/0 = 0
+3:3/0 = 0
+
 [resource]
 tile_size = Vector2i(64, 64)
 sources/12 = SubResource("TileSetAtlasSource_fxl1w")
 sources/13 = SubResource("TileSetAtlasSource_6pcam")
+sources/15 = SubResource("TileSetAtlasSource_cboec")
