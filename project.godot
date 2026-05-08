@@ -39,6 +39,10 @@ project/assembly_name="異世界の不思議な冒険ギルド"
 
 enabled=PackedStringArray("res://addons/godot_mcp/plugin.cfg")
 
+[gui]
+
+theme/default_font_size=24
+
 [rendering]
 
 renderer/rendering_method="mobile"
