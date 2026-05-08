@@ -11,6 +11,7 @@ const DASH_MAX_STEPS := 20
 # リソース変動の周期（ターン）
 const HUNGER_TICK_INTERVAL := 10  # 10 ターンごとに満腹度 -1
 const SP_RECOVER_INTERVAL := 5    # 5 ターンごとに SP +1
+const HP_RECOVER_INTERVAL := 3    # 3 ターンごとに HP +1
 
 # スプライトシート行（8方向）
 const DIR_DOWN  = 0
@@ -146,6 +147,7 @@ func _on_turn_cycle_completed() -> void:
 	if in_village or _is_dead:
 		return
 	_turns_in_dungeon += 1
+	var stats_dirty := false
 	# 10 ターンごとに満腹度 -1
 	if _turns_in_dungeon % HUNGER_TICK_INTERVAL == 0 and hunger > 0:
 		hunger -= 1
@@ -153,6 +155,12 @@ func _on_turn_cycle_completed() -> void:
 	# 5 ターンごとに SP +1（上限まで）
 	if _turns_in_dungeon % SP_RECOVER_INTERVAL == 0 and sp < max_sp:
 		sp += 1
+		stats_dirty = true
+	# 3 ターンごとに HP +1（上限まで・空腹時は回復しない）
+	if _turns_in_dungeon % HP_RECOVER_INTERVAL == 0 and hp < max_hp and hunger > 0:
+		hp += 1
+		stats_dirty = true
+	if stats_dirty:
 		stats_changed.emit(hp, max_hp, sp, max_sp)
 
 func wait_in_place() -> void:
