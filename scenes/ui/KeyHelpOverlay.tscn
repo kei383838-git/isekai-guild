@@ -1,0 +1,127 @@
+[gd_scene load_steps=2 format=3 uid="uid://c7y3qm9khelpz"]
+
+[ext_resource type="Script" path="res://scripts/ui/KeyHelpOverlay.gd" id="1_khelp"]
+
+[node name="KeyHelpOverlay" type="CanvasLayer"]
+process_mode = 3
+layer = 150
+script = ExtResource("1_khelp")
+
+[node name="Panel" type="Panel" parent="."]
+anchor_left = 1.0
+anchor_top = 0.0
+anchor_right = 1.0
+anchor_bottom = 0.0
+offset_left = -260.0
+offset_top = 10.0
+offset_right = -10.0
+offset_bottom = 320.0
+mouse_filter = 2
+
+[node name="Margin" type="MarginContainer" parent="Panel"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+theme_override_constants/margin_left = 12
+theme_override_constants/margin_top = 8
+theme_override_constants/margin_right = 12
+theme_override_constants/margin_bottom = 8
+mouse_filter = 2
+
+[node name="VBox" type="VBoxContainer" parent="Panel/Margin"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 6
+
+[node name="Title" type="Label" parent="Panel/Margin/VBox"]
+layout_mode = 2
+horizontal_alignment = 1
+text = "操作"
+
+[node name="HSep" type="HSeparator" parent="Panel/Margin/VBox"]
+layout_mode = 2
+
+[node name="Grid" type="GridContainer" parent="Panel/Margin/VBox"]
+layout_mode = 2
+columns = 2
+theme_override_constants/h_separation = 14
+theme_override_constants/v_separation = 4
+
+[node name="K01" type="Label" parent="Panel/Margin/VBox/Grid"]
+layout_mode = 2
+text = "矢印"
+
+[node name="V01" type="Label" parent="Panel/Margin/VBox/Grid"]
+layout_mode = 2
+text = "移動"
+
+[node name="K02" type="Label" parent="Panel/Margin/VBox/Grid"]
+layout_mode = 2
+text = "Ctrl+矢印"
+
+[node name="V02" type="Label" parent="Panel/Margin/VBox/Grid"]
+layout_mode = 2
+text = "斜め移動"
+
+[node name="K03" type="Label" parent="Panel/Margin/VBox/Grid"]
+layout_mode = 2
+text = "C+矢印"
+
+[node name="V03" type="Label" parent="Panel/Margin/VBox/Grid"]
+layout_mode = 2
+text = "振り向き"
+
+[node name="K04" type="Label" parent="Panel/Margin/VBox/Grid"]
+layout_mode = 2
+text = "Tab"
+
+[node name="V04" type="Label" parent="Panel/Margin/VBox/Grid"]
+layout_mode = 2
+text = "待機"
+
+[node name="K05" type="Label" parent="Panel/Margin/VBox/Grid"]
+layout_mode = 2
+text = "X+矢印"
+
+[node name="V05" type="Label" parent="Panel/Margin/VBox/Grid"]
+layout_mode = 2
+text = "ダッシュ"
+
+[node name="K06" type="Label" parent="Panel/Margin/VBox/Grid"]
+layout_mode = 2
+text = "Space"
+
+[node name="V06" type="Label" parent="Panel/Margin/VBox/Grid"]
+layout_mode = 2
+text = "攻撃"
+
+[node name="K07" type="Label" parent="Panel/Margin/VBox/Grid"]
+layout_mode = 2
+text = "Enter"
+
+[node name="V07" type="Label" parent="Panel/Margin/VBox/Grid"]
+layout_mode = 2
+text = "調べる"
+
+[node name="K08" type="Label" parent="Panel/Margin/VBox/Grid"]
+layout_mode = 2
+text = "M"
+
+[node name="V08" type="Label" parent="Panel/Margin/VBox/Grid"]
+layout_mode = 2
+text = "マップ"
+
+[node name="K09" type="Label" parent="Panel/Margin/VBox/Grid"]
+layout_mode = 2
+text = "Esc"
+
+[node name="V09" type="Label" parent="Panel/Margin/VBox/Grid"]
+layout_mode = 2
+text = "ダンジョン帰還"
+
+[node name="K10" type="Label" parent="Panel/Margin/VBox/Grid"]
+layout_mode = 2
+text = "E"
+
+[node name="V10" type="Label" parent="Panel/Margin/VBox/Grid"]
+layout_mode = 2
+text = "メニュー"

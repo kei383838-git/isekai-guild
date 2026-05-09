@@ -21,6 +21,8 @@ TurnManager="*res://scripts/systems/TurnManager.gd"
 LogManager="*res://scripts/systems/LogManager.gd"
 QuestManager="*res://scripts/systems/QuestManager.gd"
 PlayerData="*res://scripts/systems/PlayerData.gd"
+PauseMenu="*res://scenes/ui/PauseMenu.tscn"
+KeyHelpOverlay="*res://scenes/ui/KeyHelpOverlay.tscn"
 
 [display]
 

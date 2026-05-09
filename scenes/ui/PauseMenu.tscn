@@ -1,0 +1,231 @@
+[gd_scene load_steps=2 format=3 uid="uid://b8x2pq5y3m4ru"]
+
+[ext_resource type="Script" path="res://scripts/ui/PauseMenu.gd" id="1_pmenu"]
+
+[node name="PauseMenu" type="CanvasLayer"]
+process_mode = 3
+layer = 100
+visible = false
+script = ExtResource("1_pmenu")
+
+[node name="Dim" type="ColorRect" parent="."]
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0, 0, 0, 0.55)
+mouse_filter = 0
+
+[node name="Panel" type="Panel" parent="."]
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -480.0
+offset_top = -340.0
+offset_right = 480.0
+offset_bottom = 340.0
+
+[node name="Margin" type="MarginContainer" parent="Panel"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+theme_override_constants/margin_left = 24
+theme_override_constants/margin_top = 24
+theme_override_constants/margin_right = 24
+theme_override_constants/margin_bottom = 24
+
+[node name="VBox" type="VBoxContainer" parent="Panel/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="TitleLabel" type="Label" parent="Panel/Margin/VBox"]
+layout_mode = 2
+horizontal_alignment = 1
+text = "メニュー"
+
+[node name="HSep0" type="HSeparator" parent="Panel/Margin/VBox"]
+layout_mode = 2
+
+[node name="Body" type="HBoxContainer" parent="Panel/Margin/VBox"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 16
+
+[node name="MenuButtons" type="VBoxContainer" parent="Panel/Margin/VBox/Body"]
+custom_minimum_size = Vector2(160, 0)
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="InventoryButton" type="Button" parent="Panel/Margin/VBox/Body/MenuButtons"]
+layout_mode = 2
+text = "持ち物"
+
+[node name="QuestButton" type="Button" parent="Panel/Margin/VBox/Body/MenuButtons"]
+layout_mode = 2
+text = "クエスト"
+
+[node name="SettingsButton" type="Button" parent="Panel/Margin/VBox/Body/MenuButtons"]
+layout_mode = 2
+focus_mode = 0
+disabled = true
+text = "設定"
+
+[node name="SuspendButton" type="Button" parent="Panel/Margin/VBox/Body/MenuButtons"]
+layout_mode = 2
+focus_mode = 0
+disabled = true
+text = "中断"
+
+[node name="CloseButton" type="Button" parent="Panel/Margin/VBox/Body/MenuButtons"]
+layout_mode = 2
+text = "閉じる"
+
+[node name="VSep0" type="VSeparator" parent="Panel/Margin/VBox/Body"]
+layout_mode = 2
+
+[node name="EmptyView" type="Label" parent="Panel/Margin/VBox/Body"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+horizontal_alignment = 1
+vertical_alignment = 1
+text = "左の項目を選択してください。"
+
+[node name="InventoryView" type="HBoxContainer" parent="Panel/Margin/VBox/Body"]
+visible = false
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_constants/separation = 12
+
+[node name="LeftCol" type="VBoxContainer" parent="Panel/Margin/VBox/Body/InventoryView"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_constants/separation = 4
+
+[node name="ListScroll" type="ScrollContainer" parent="Panel/Margin/VBox/Body/InventoryView/LeftCol"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="ItemList" type="VBoxContainer" parent="Panel/Margin/VBox/Body/InventoryView/LeftCol/ListScroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 4
+
+[node name="EmptyLabel" type="Label" parent="Panel/Margin/VBox/Body/InventoryView/LeftCol"]
+layout_mode = 2
+text = "所持品はありません。"
+
+[node name="VSep1" type="VSeparator" parent="Panel/Margin/VBox/Body/InventoryView"]
+layout_mode = 2
+
+[node name="Detail" type="VBoxContainer" parent="Panel/Margin/VBox/Body/InventoryView"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_constants/separation = 6
+
+[node name="NameLabel" type="Label" parent="Panel/Margin/VBox/Body/InventoryView/Detail"]
+layout_mode = 2
+text = ""
+
+[node name="CountLabel" type="Label" parent="Panel/Margin/VBox/Body/InventoryView/Detail"]
+layout_mode = 2
+text = ""
+
+[node name="DescLabel" type="Label" parent="Panel/Margin/VBox/Body/InventoryView/Detail"]
+layout_mode = 2
+autowrap_mode = 2
+text = ""
+
+[node name="Spacer" type="Control" parent="Panel/Margin/VBox/Body/InventoryView/Detail"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="Buttons" type="HBoxContainer" parent="Panel/Margin/VBox/Body/InventoryView/Detail"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="UseButton" type="Button" parent="Panel/Margin/VBox/Body/InventoryView/Detail/Buttons"]
+layout_mode = 2
+size_flags_horizontal = 3
+focus_mode = 0
+disabled = true
+text = "使う"
+
+[node name="DropButton" type="Button" parent="Panel/Margin/VBox/Body/InventoryView/Detail/Buttons"]
+layout_mode = 2
+size_flags_horizontal = 3
+focus_mode = 0
+disabled = true
+text = "捨てる"
+
+[node name="QuestView" type="VBoxContainer" parent="Panel/Margin/VBox/Body"]
+visible = false
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_constants/separation = 8
+
+[node name="NoneLabel" type="Label" parent="Panel/Margin/VBox/Body/QuestView"]
+layout_mode = 2
+autowrap_mode = 2
+text = "依頼を受けていません。
+冒険者ギルドの掲示板で受注してください。"
+
+[node name="Active" type="VBoxContainer" parent="Panel/Margin/VBox/Body/QuestView"]
+layout_mode = 2
+visible = false
+theme_override_constants/separation = 4
+
+[node name="TitleLabel" type="Label" parent="Panel/Margin/VBox/Body/QuestView/Active"]
+layout_mode = 2
+text = ""
+
+[node name="TypeLabel" type="Label" parent="Panel/Margin/VBox/Body/QuestView/Active"]
+layout_mode = 2
+text = ""
+
+[node name="TargetLabel" type="Label" parent="Panel/Margin/VBox/Body/QuestView/Active"]
+layout_mode = 2
+text = ""
+
+[node name="ProgressLabel" type="Label" parent="Panel/Margin/VBox/Body/QuestView/Active"]
+layout_mode = 2
+text = ""
+
+[node name="DungeonLabel" type="Label" parent="Panel/Margin/VBox/Body/QuestView/Active"]
+layout_mode = 2
+text = ""
+
+[node name="DescLabel" type="Label" parent="Panel/Margin/VBox/Body/QuestView/Active"]
+layout_mode = 2
+autowrap_mode = 2
+text = ""
+
+[node name="HSep1" type="HSeparator" parent="Panel/Margin/VBox"]
+layout_mode = 2
+
+[node name="StatusFooter" type="HBoxContainer" parent="Panel/Margin/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 24
+
+[node name="HPLabel" type="Label" parent="Panel/Margin/VBox/StatusFooter"]
+layout_mode = 2
+text = "HP: -"
+
+[node name="SPLabel" type="Label" parent="Panel/Margin/VBox/StatusFooter"]
+layout_mode = 2
+text = "SP: -"
+
+[node name="HungerLabel" type="Label" parent="Panel/Margin/VBox/StatusFooter"]
+layout_mode = 2
+text = "満腹度: -"
+
+[node name="GoldLabel" type="Label" parent="Panel/Margin/VBox/StatusFooter"]
+layout_mode = 2
+text = "ゴールド: -"
+
+[node name="JobLabel" type="Label" parent="Panel/Margin/VBox/StatusFooter"]
+layout_mode = 2
+text = "ジョブ: -"
