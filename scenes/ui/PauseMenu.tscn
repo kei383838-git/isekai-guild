@@ -102,6 +102,14 @@ size_flags_horizontal = 3
 size_flags_vertical = 3
 theme_override_constants/separation = 4
 
+[node name="EquipSummary" type="Label" parent="Panel/Margin/VBox/Body/InventoryView/LeftCol"]
+layout_mode = 2
+autowrap_mode = 2
+text = "[装備] 武器:なし  盾:なし  アクセ:なし  投擲:なし"
+
+[node name="EquipSep" type="HSeparator" parent="Panel/Margin/VBox/Body/InventoryView/LeftCol"]
+layout_mode = 2
+
 [node name="ListScroll" type="ScrollContainer" parent="Panel/Margin/VBox/Body/InventoryView/LeftCol"]
 layout_mode = 2
 size_flags_horizontal = 3
@@ -133,6 +141,14 @@ text = ""
 layout_mode = 2
 text = ""
 
+[node name="KindLabel" type="Label" parent="Panel/Margin/VBox/Body/InventoryView/Detail"]
+layout_mode = 2
+text = ""
+
+[node name="StatusLabel" type="Label" parent="Panel/Margin/VBox/Body/InventoryView/Detail"]
+layout_mode = 2
+text = ""
+
 [node name="DescLabel" type="Label" parent="Panel/Margin/VBox/Body/InventoryView/Detail"]
 layout_mode = 2
 autowrap_mode = 2
@@ -144,7 +160,7 @@ size_flags_vertical = 3
 
 [node name="Buttons" type="HBoxContainer" parent="Panel/Margin/VBox/Body/InventoryView/Detail"]
 layout_mode = 2
-theme_override_constants/separation = 8
+theme_override_constants/separation = 6
 
 [node name="UseButton" type="Button" parent="Panel/Margin/VBox/Body/InventoryView/Detail/Buttons"]
 layout_mode = 2
@@ -152,6 +168,27 @@ size_flags_horizontal = 3
 focus_mode = 0
 disabled = true
 text = "使う"
+
+[node name="EquipButton" type="Button" parent="Panel/Margin/VBox/Body/InventoryView/Detail/Buttons"]
+layout_mode = 2
+size_flags_horizontal = 3
+focus_mode = 0
+disabled = true
+text = "装備"
+
+[node name="UnequipButton" type="Button" parent="Panel/Margin/VBox/Body/InventoryView/Detail/Buttons"]
+layout_mode = 2
+size_flags_horizontal = 3
+focus_mode = 0
+disabled = true
+text = "外す"
+
+[node name="ThrowButton" type="Button" parent="Panel/Margin/VBox/Body/InventoryView/Detail/Buttons"]
+layout_mode = 2
+size_flags_horizontal = 3
+focus_mode = 0
+disabled = true
+text = "投げる"
 
 [node name="DropButton" type="Button" parent="Panel/Margin/VBox/Body/InventoryView/Detail/Buttons"]
 layout_mode = 2

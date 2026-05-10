@@ -1,25 +1,94 @@
 extends Node2D
 class_name Item
 
+# アイテム種別。装備スロットへの対応付けは PlayerData.slot_for_kind() で行う。
+# 詳細は docs/system/equipment.md。
+enum Kind { FOOD, WEAPON, SHIELD, ACCESSORY, THROW, MISC }
+
+# アイテム定義表。新しいアイテムはここに行を足す。
+# label : 表示名
+# kind  : 種別（Kind enum）
+# amount: 食料の場合の満腹度回復量。それ以外では未使用
+# desc  : 詳細パネルに出す説明文
+const DEFS := {
+	"herb": {
+		"label": "薬草",
+		"kind": Kind.FOOD,
+		"amount": 10,
+		"desc": "齧ると満腹度が少し回復する。",
+	},
+	"wooden_sword": {
+		"label": "木の剣",
+		"kind": Kind.WEAPON,
+		"desc": "握りやすい簡素な木の剣。",
+	},
+	"wooden_shield": {
+		"label": "木の盾",
+		"kind": Kind.SHIELD,
+		"desc": "薄い木でできた軽量な盾。",
+	},
+	"talisman": {
+		"label": "お守り",
+		"kind": Kind.ACCESSORY,
+		"desc": "何か起こりそうな気がする御守り。",
+	},
+	"throw_stone": {
+		"label": "投石",
+		"kind": Kind.THROW,
+		"desc": "投げて使う小石。",
+	},
+	"gold": {
+		"label": "ゴールド",
+		"kind": Kind.MISC,
+		"desc": "通貨。",
+	},
+}
+
+# 種別ごとのフィールド表示色（仮置き。本素材投入時に廃止予定）
+const KIND_COLORS := {
+	Kind.FOOD:      Color(0.4, 0.9, 0.4),
+	Kind.WEAPON:    Color(0.95, 0.4, 0.3),
+	Kind.SHIELD:    Color(0.4, 0.6, 0.95),
+	Kind.ACCESSORY: Color(0.95, 0.85, 0.3),
+	Kind.THROW:     Color(0.6, 0.85, 0.95),
+	Kind.MISC:      Color(0.85, 0.75, 0.3),
+}
+
 @export var item_type: String = "herb"
 @export var amount: int = 1
 @export var stackable: bool = true
 
 @onready var sprite = get_node_or_null("Sprite2D")
 
-# アイテムキーから表示名を引く。Player のログや HUD の所持品表示で共通利用する。
-# 未登録のキーはそのまま返す（ローカライズ未整備時のフォールバック）。
+# 表示名。未登録キーはそのまま返す（フォールバック）。
 static func label_for(item_type_key: String) -> String:
-	match item_type_key:
-		"herb": return "薬草"
-		"gold": return "ゴールド"
-	return item_type_key
+	var def = DEFS.get(item_type_key, null)
+	if def == null:
+		return item_type_key
+	return def.label
+
+# kind を引く。未登録は MISC。
+static func kind_for(item_type_key: String) -> int:
+	var def = DEFS.get(item_type_key, null)
+	if def == null:
+		return Kind.MISC
+	return def.kind
+
+# 説明文。未登録は空文字。
+static func desc_for(item_type_key: String) -> String:
+	var def = DEFS.get(item_type_key, null)
+	if def == null:
+		return ""
+	return def.get("desc", "")
+
+# 食料の満腹度回復量。食料以外は 0。
+static func food_amount_for(item_type_key: String) -> int:
+	var def = DEFS.get(item_type_key, null)
+	if def == null or def.kind != Kind.FOOD:
+		return 0
+	return def.get("amount", 0)
 
 func _ready():
 	add_to_group("items")
-	# 簡易的な見た目設定 (Sprite2D が存在する場合のみ)
 	if sprite:
-		if item_type == "herb":
-			sprite.modulate = Color.GREEN
-		elif item_type == "gold":
-			sprite.modulate = Color.GOLD
+		sprite.modulate = KIND_COLORS.get(kind_for(item_type), Color.WHITE)

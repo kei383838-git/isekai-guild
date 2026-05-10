@@ -16,6 +16,7 @@ room_count_max = 7
 room_size_min = 3
 room_size_max = 5
 enemies_per_floor = 2
+item_types = Array[String](["herb", "wooden_sword", "wooden_shield", "talisman", "throw_stone"])
 items_per_floor_min = 2
 items_per_floor_max = 3
 floor_tile_set = ExtResource("2_floor")

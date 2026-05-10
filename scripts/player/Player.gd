@@ -163,6 +163,15 @@ func _on_turn_cycle_completed() -> void:
 	if stats_dirty:
 		stats_changed.emit(hp, max_hp, sp, max_sp)
 
+# 食料アイテム使用：満腹度を amount だけ回復（最大値クランプ）。
+# 在庫の減算は呼び元（PauseMenu）で PlayerData.remove_item を呼ぶ。
+# ターン消費も呼び元で TurnManager.advance_turn() を呼ぶ。
+func eat_food(amount: int) -> void:
+	if amount <= 0:
+		return
+	hunger = min(max_hunger, hunger + amount)
+	hunger_changed.emit(hunger, max_hunger)
+
 func wait_in_place() -> void:
 	_step = (_step + 1) % 2
 	sprite.frame_coords = Vector2i(_step * 2, facing)
