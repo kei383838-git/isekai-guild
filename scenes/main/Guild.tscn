@@ -1,61 +1,159 @@
-[gd_scene load_steps=5 format=3 uid="uid://cgp1du50b3hlb"]
+[gd_scene load_steps=20 format=3 uid="uid://cgp1du50b3hlb"]
 
 [ext_resource type="Script" uid="uid://cp8vi82nn01x5" path="res://scripts/main/Guild.gd" id="1_guild"]
 [ext_resource type="PackedScene" uid="uid://box2u8ur0eh8q" path="res://scenes/Player/Player.tscn" id="2_player"]
 [ext_resource type="PackedScene" uid="uid://75fd8mliijcb" path="res://scenes/ui/HUD.tscn" id="3_hud"]
 [ext_resource type="PackedScene" path="res://scenes/ui/QuestBoardUI.tscn" id="4_qbui"]
+[ext_resource type="Texture2D" uid="uid://c4ujjgmuuo0uu" path="res://assets/backgrounds/guild_background_full_v1_960x720.png" id="5_guild_bg"]
+[ext_resource type="Texture2D" uid="uid://d2u3nysskeo2n" path="res://assets/props/guild/guild_furniture_v1_scaled/01_quest_board.png" id="6_quest_board"]
+[ext_resource type="Texture2D" uid="uid://dx85v5dicf2xd" path="res://assets/props/guild/guild_furniture_v1_scaled/02_stairs.png" id="7_stairs"]
+[ext_resource type="Texture2D" uid="uid://cu3nyc4ipqpir" path="res://assets/props/guild/guild_furniture_v1_scaled/03_counter_l.png" id="8_counter"]
+[ext_resource type="Texture2D" uid="uid://dj77an2t46jwv" path="res://assets/props/guild/guild_furniture_v1_scaled/04_table_a.png" id="9_table_a"]
+[ext_resource type="Texture2D" uid="uid://camt0bx0mh3g0" path="res://assets/props/guild/guild_furniture_v1_scaled/07_stool_a.png" id="11_stool"]
+[ext_resource type="Texture2D" uid="uid://7jp8oo8yydll" path="res://assets/props/guild/guild_furniture_v1_scaled/12_barrel.png" id="12_barrel"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_wall_back_block"]
+size = Vector2(640, 119)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_wall_side_block"]
+size = Vector2(67, 384)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_wall_front_left_block"]
+size = Vector2(300, 96)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_wall_front_right_block"]
+size = Vector2(248, 96)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_counter_block"]
+size = Vector2(64, 200)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_table_block"]
+size = Vector2(104, 64)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_barrel_block"]
+size = Vector2(54, 54)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_stairs_block"]
+size = Vector2(78, 131)
 
 [node name="Guild" type="Node2D"]
 script = ExtResource("1_guild")
 
+[node name="BlackBackground" type="ColorRect" parent="."]
+z_index = -20
+offset_left = -1576.0
+offset_top = -2061.0
+offset_right = 2424.0
+offset_bottom = 1939.0
+color = Color(0, 0, 0, 1)
+
+[node name="Background" type="Sprite2D" parent="."]
+z_index = -10
+position = Vector2(29, 66)
+scale = Vector2(0.7, 0.754167)
+texture = ExtResource("5_guild_bg")
+centered = false
+
 [node name="Floor" type="ColorRect" parent="."]
-offset_right = 640.0
-offset_bottom = 512.0
+visible = false
+offset_left = -392.0
+offset_top = 292.0
+offset_right = -211.0
+offset_bottom = 409.0
 color = Color(0.6, 0.44, 0.26, 1)
 
 [node name="WallBack" type="ColorRect" parent="."]
+visible = false
 offset_right = 640.0
 offset_bottom = 32.0
 color = Color(0.25, 0.15, 0.08, 1)
 
 [node name="WallLeft" type="ColorRect" parent="."]
+visible = false
 offset_right = 32.0
 offset_bottom = 512.0
 color = Color(0.25, 0.15, 0.08, 1)
 
 [node name="WallRight" type="ColorRect" parent="."]
+visible = false
 offset_left = 608.0
 offset_right = 640.0
 offset_bottom = 512.0
 color = Color(0.25, 0.15, 0.08, 1)
 
-[node name="QuestBoard" type="Node2D" parent="."]
-position = Vector2(320, 64)
+[node name="WallBlocks" type="Node2D" parent="."]
 
-[node name="BoardRect" type="ColorRect" parent="QuestBoard"]
-offset_left = -112.0
-offset_top = -28.0
-offset_right = 112.0
-offset_bottom = -2.0
-color = Color(0.5, 0.32, 0.1, 1)
+[node name="BackWallBlock" type="StaticBody2D" parent="WallBlocks" groups=["blocking_props"]]
+position = Vector2(320, 112)
+metadata/blocks_movement = true
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="WallBlocks/BackWallBlock"]
+position = Vector2(0, 11.5)
+shape = SubResource("RectangleShape2D_wall_back_block")
+
+[node name="LeftWallBlock" type="StaticBody2D" parent="WallBlocks" groups=["blocking_props"]]
+position = Vector2(64, 304)
+metadata/blocks_movement = true
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="WallBlocks/LeftWallBlock"]
+shape = SubResource("RectangleShape2D_wall_side_block")
+
+[node name="RightWallBlock" type="StaticBody2D" parent="WallBlocks" groups=["blocking_props"]]
+position = Vector2(640, 304)
+metadata/blocks_movement = true
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="WallBlocks/RightWallBlock"]
+position = Vector2(39, 7)
+shape = SubResource("RectangleShape2D_wall_side_block")
+
+[node name="FrontWallLeftBlock" type="StaticBody2D" parent="WallBlocks" groups=["blocking_props"]]
+position = Vector2(150, 496)
+metadata/blocks_movement = true
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="WallBlocks/FrontWallLeftBlock"]
+shape = SubResource("RectangleShape2D_wall_front_left_block")
+
+[node name="FrontWallRightBlock" type="StaticBody2D" parent="WallBlocks" groups=["blocking_props"]]
+position = Vector2(530, 496)
+metadata/blocks_movement = true
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="WallBlocks/FrontWallRightBlock"]
+position = Vector2(-14, 0)
+shape = SubResource("RectangleShape2D_wall_front_right_block")
+
+[node name="QuestBoard" type="Node2D" parent="."]
+position = Vector2(367, 164)
+
+[node name="BoardSprite" type="Sprite2D" parent="QuestBoard"]
+position = Vector2(-112, -90)
+texture = ExtResource("6_quest_board")
+centered = false
 
 [node name="BoardLabel" type="Label" parent="QuestBoard"]
+visible = false
 offset_left = -32.0
 offset_top = -33.0
 offset_right = 53.0
 offset_bottom = -10.0
 text = "クエストボード"
 
-[node name="Counter" type="ColorRect" parent="."]
-offset_left = 129.0
-offset_top = 192.0
-offset_right = 192.0
-offset_bottom = 381.0
-color = Color(0.32, 0.18, 0.07, 1)
+[node name="Counter" type="Sprite2D" parent="." groups=["blocking_props"]]
+position = Vector2(193, 170)
+scale = Vector2(-1, 1)
+texture = ExtResource("8_counter")
+centered = false
+metadata/blocks_movement = true
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Counter"]
+position = Vector2(32, 100)
+shape = SubResource("RectangleShape2D_counter_block")
 
 [node name="CounterLabel" type="Label" parent="."]
-offset_left = 48.0
-offset_top = 196.0
+visible = false
+offset_left = 42.0
+offset_top = 356.0
+offset_right = 134.0
+offset_bottom = 379.0
 text = "受付カウンター"
 
 [node name="Receptionist" type="Node2D" parent="."]
@@ -75,59 +173,108 @@ offset_right = 27.0
 offset_bottom = 43.0
 text = "受付嬢"
 
-[node name="Table1" type="Node2D" parent="."]
-position = Vector2(448, 242)
+[node name="Table1" type="Node2D" parent="." groups=["blocking_props"]]
+position = Vector2(513, 279)
+metadata/blocks_movement = true
 
-[node name="TableRect" type="ColorRect" parent="Table1"]
-offset_left = -48.0
-offset_top = -23.0
-offset_right = 48.0
-offset_bottom = 17.0
-color = Color(0.4, 0.26, 0.12, 1)
+[node name="TableSprite" type="Sprite2D" parent="Table1"]
+position = Vector2(-54, -25)
+texture = ExtResource("9_table_a")
+centered = false
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Table1"]
+position = Vector2(0, 7)
+shape = SubResource("RectangleShape2D_table_block")
 
 [node name="TableLabel" type="Label" parent="Table1"]
-offset_left = -23.0
-offset_top = -16.0
-offset_right = 24.0
-offset_bottom = 7.0
+visible = false
+offset_left = -21.0
+offset_top = -1.0
+offset_right = 26.0
+offset_bottom = 22.0
 text = "テーブル"
 
-[node name="Table2" type="Node2D" parent="."]
+[node name="Chair1" type="Node2D" parent="."]
+position = Vector2(448, 192)
+
+[node name="Sprite2D" type="Sprite2D" parent="Chair1"]
+position = Vector2(34, 40)
+texture = ExtResource("11_stool")
+
+[node name="Chair2" type="Node2D" parent="."]
+position = Vector2(512, 192)
+
+[node name="Sprite2D" type="Sprite2D" parent="Chair2"]
+position = Vector2(25, 40)
+texture = ExtResource("11_stool")
+
+[node name="Chair3" type="Node2D" parent="."]
 position = Vector2(448, 320)
 
-[node name="TableRect" type="ColorRect" parent="Table2"]
-offset_left = -48.0
-offset_top = -20.0
-offset_right = 48.0
-offset_bottom = 20.0
-color = Color(0.4, 0.26, 0.12, 1)
+[node name="Sprite2D" type="Sprite2D" parent="Chair3"]
+position = Vector2(36, 29)
+texture = ExtResource("11_stool")
 
-[node name="TableLabel" type="Label" parent="Table2"]
-offset_left = -24.0
-offset_top = -10.0
-text = "テーブル"
+[node name="Chair4" type="Node2D" parent="."]
+position = Vector2(512, 320)
 
-[node name="Stairs2F" type="Node2D" parent="."]
-position = Vector2(576, 192)
+[node name="Sprite2D" type="Sprite2D" parent="Chair4"]
+position = Vector2(27, 30)
+texture = ExtResource("11_stool")
 
-[node name="StairRect" type="ColorRect" parent="Stairs2F"]
-offset_left = -28.0
-offset_top = -161.0
-offset_right = 28.0
-offset_bottom = 80.0
-color = Color(0.55, 0.42, 0.22, 1)
+[node name="Barrel1" type="StaticBody2D" parent="." groups=["blocking_props"]]
+position = Vector2(128, 384)
+metadata/blocks_movement = true
+
+[node name="Sprite2D" type="Sprite2D" parent="Barrel1"]
+position = Vector2(32, 26)
+texture = ExtResource("12_barrel")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Barrel1"]
+position = Vector2(32, 32)
+shape = SubResource("RectangleShape2D_barrel_block")
+
+[node name="Barrel2" type="StaticBody2D" parent="." groups=["blocking_props"]]
+position = Vector2(64, 384)
+metadata/blocks_movement = true
+
+[node name="Sprite2D" type="Sprite2D" parent="Barrel2"]
+position = Vector2(32, 27)
+texture = ExtResource("12_barrel")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Barrel2"]
+position = Vector2(32, 32)
+shape = SubResource("RectangleShape2D_barrel_block")
+
+[node name="Stairs2F" type="Node2D" parent="." groups=["blocking_props"]]
+position = Vector2(596, 285)
+metadata/blocks_movement = true
+
+[node name="StairSprite" type="Sprite2D" parent="Stairs2F"]
+position = Vector2(-23, -164)
+texture = ExtResource("7_stairs")
+centered = false
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Stairs2F"]
+position = Vector2(16, -98.5)
+shape = SubResource("RectangleShape2D_stairs_block")
 
 [node name="StairLabel" type="Label" parent="Stairs2F"]
-offset_left = -20.0
-offset_top = -72.0
+visible = false
+offset_left = 1.0
+offset_top = -87.0
+offset_right = 21.0
+offset_bottom = -15.0
 text = "2F"
 
 [node name="GuildExit" type="Node2D" parent="."]
-position = Vector2(320, 448)
+position = Vector2(320, 512)
 
 [node name="ExitLabel" type="Label" parent="GuildExit"]
-offset_left = -40.0
-offset_top = -20.0
+offset_left = -6.0
+offset_top = 26.0
+offset_right = 88.0
+offset_bottom = 49.0
 text = "出口（村へ）"
 
 [node name="Player" parent="." instance=ExtResource("2_player")]
@@ -136,3 +283,4 @@ position = Vector2(320, 384)
 [node name="HUD" parent="." instance=ExtResource("3_hud")]
 
 [node name="QuestBoardUI" parent="." instance=ExtResource("4_qbui")]
+visible = false
