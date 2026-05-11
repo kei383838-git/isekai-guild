@@ -71,10 +71,11 @@ func _ready() -> void:
 
 	_btn_inventory.pressed.connect(_show_inventory)
 	_btn_quest.pressed.connect(_show_quest)
+	_btn_suspend.pressed.connect(_on_suspend_pressed)
 	_btn_close.pressed.connect(close)
-	# 設定・中断は Phase 3 以降
+	# 設定は Phase 3 以降
 	_btn_settings.disabled = true
-	_btn_suspend.disabled = true
+	# 中断ボタンの enable/disable は open() 時に in_village + current_slot で判定する
 
 	# アクションボタン接続。enable/disable は _refresh_action_buttons() で動的に変える
 	_btn_use.pressed.connect(_on_use_pressed)
@@ -115,6 +116,7 @@ func open() -> void:
 	# 中央コンテンツは空表示で開く。持ち物ボタンに初期フォーカスを当てる。
 	_show_empty()
 	_refresh_status()
+	_refresh_suspend_button()
 	_btn_inventory.grab_focus()
 
 func close() -> void:
@@ -329,6 +331,31 @@ func _refresh_quest() -> void:
 	var dungeon_name: String = q.dungeon_config.display_name if q.dungeon_config else "未設定"
 	_quest_dungeon.text  = "行き先: " + dungeon_name
 	_quest_desc.text     = q.description
+
+# --- 中断 ---
+
+# 中断ボタンの enable 条件：
+# - ダンジョン中（_player.in_village == false）
+# - スロットが選択されている（SaveManager.current_slot >= 1）
+# 通常セーブ（村）は Phase B で実装。
+func _refresh_suspend_button() -> void:
+	var enabled: bool = (
+		_player != null and is_instance_valid(_player)
+		and not _player.in_village
+		and SaveManager.current_slot >= 1
+	)
+	_set_btn_enabled(_btn_suspend, enabled)
+
+func _on_suspend_pressed() -> void:
+	if SaveManager.current_slot < 1:
+		LogManager.add_log("スロットが選択されていないため中断できない。")
+		return
+	if not SaveManager.save_suspend(SaveManager.current_slot):
+		LogManager.add_log("中断セーブに失敗した。")
+		return
+	LogManager.add_log("中断した。")
+	close()
+	get_tree().change_scene_to_file("res://scenes/ui/TitleScreen.tscn")
 
 # --- ステータスフッター ---
 

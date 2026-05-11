@@ -23,10 +23,22 @@ var is_transitioning := false
 
 func _ready() -> void:
 	_register_input_actions()
-	config = _resolve_config()
-	_apply_appearance()
-	_setup_stair_visual()
-	_generate_new_floor()
+	# 中断ロード経路：SaveManager から pending_dungeon が来ていれば、
+	# 通常生成の代わりに保存されたフロアを復元する。
+	var pending := SaveManager.consume_pending_dungeon()
+	if not pending.is_empty():
+		config = _config_from_id(pending.get("config_id", ""))
+		_apply_appearance()
+		_setup_stair_visual()
+		load_dungeon_state(pending)
+		var pp := SaveManager.consume_pending_player()
+		if not pp.is_empty():
+			player.load_state(pp)
+	else:
+		config = _resolve_config()
+		_apply_appearance()
+		_setup_stair_visual()
+		_generate_new_floor()
 
 	TurnManager.enemy_turn_started.connect(_on_player_action_finished)
 	if player.has_signal("died"):
@@ -49,6 +61,14 @@ func _resolve_config() -> DungeonConfig:
 		return fallback
 	push_warning("Dungeon: DungeonConfig が見つからないため空 config で起動します。")
 	return DungeonConfig.new()
+
+# 中断ロード時に config を id から引く。
+# Phase A は forest_beginner のみ。今後はレジストリ化する。
+func _config_from_id(id: String) -> DungeonConfig:
+	if id == "forest_beginner":
+		return load(FALLBACK_CONFIG_PATH) as DungeonConfig
+	push_warning("Dungeon: 未知の dungeon_config_id: %s。フォールバックを使用。" % id)
+	return _resolve_config()
 
 func _apply_appearance() -> void:
 	if background:
@@ -233,3 +253,109 @@ func _loss_rate_for_difficulty(d: int) -> float:
 		2: return 0.5
 		3: return 1.0
 	return 0.0
+
+# --- セーブ / ロード（SaveManager から呼ばれる） ---
+# docs/system/save.md 参照。
+
+func save_dungeon_state() -> Dictionary:
+	var floor_cells := []
+	for c in floor_layer.get_used_cells():
+		floor_cells.append({
+			"x": c.x, "y": c.y,
+			"src": floor_layer.get_cell_source_id(c),
+			"ax": floor_layer.get_cell_atlas_coords(c).x,
+			"ay": floor_layer.get_cell_atlas_coords(c).y,
+			"alt": floor_layer.get_cell_alternative_tile(c),
+		})
+	var wall_cells := []
+	for c in wall_layer.get_used_cells():
+		wall_cells.append({
+			"x": c.x, "y": c.y,
+			"src": wall_layer.get_cell_source_id(c),
+			"ax": wall_layer.get_cell_atlas_coords(c).x,
+			"ay": wall_layer.get_cell_atlas_coords(c).y,
+			"alt": wall_layer.get_cell_alternative_tile(c),
+		})
+	var enemies := []
+	for e in get_tree().get_nodes_in_group("enemies"):
+		if not is_instance_valid(e):
+			continue
+		var et := Vector2i(round(e.position.x / TILE_SIZE), round(e.position.y / TILE_SIZE))
+		var ehp: int = e.hp if "hp" in e else 0
+		enemies.append({"x": et.x, "y": et.y, "hp": ehp})
+	var items := []
+	for it in get_tree().get_nodes_in_group("items"):
+		if not is_instance_valid(it):
+			continue
+		var itp := Vector2i(round(it.position.x / TILE_SIZE), round(it.position.y / TILE_SIZE))
+		items.append({
+			"x": itp.x, "y": itp.y,
+			"type": it.item_type,
+			"amount": it.amount,
+		})
+	return {
+		"config_id": config.id,
+		"current_floor": current_floor,
+		"stair_x": stair_pos.x,
+		"stair_y": stair_pos.y,
+		"floor_cells": floor_cells,
+		"wall_cells": wall_cells,
+		"enemies": enemies,
+		"items": items,
+	}
+
+func load_dungeon_state(d: Dictionary) -> void:
+	current_floor = int(d.get("current_floor", 1))
+	stair_pos = Vector2i(int(d.get("stair_x", 0)), int(d.get("stair_y", 0)))
+
+	# 念のため既存の敵・アイテムをクリア
+	for e in get_tree().get_nodes_in_group("enemies"):
+		e.queue_free()
+	for it in get_tree().get_nodes_in_group("items"):
+		it.queue_free()
+
+	floor_layer.clear()
+	for c in d.get("floor_cells", []):
+		floor_layer.set_cell(
+			Vector2i(int(c["x"]), int(c["y"])),
+			int(c["src"]),
+			Vector2i(int(c["ax"]), int(c["ay"])),
+			int(c.get("alt", 0)),
+		)
+	wall_layer.clear()
+	for c in d.get("wall_cells", []):
+		wall_layer.set_cell(
+			Vector2i(int(c["x"]), int(c["y"])),
+			int(c["src"]),
+			Vector2i(int(c["ax"]), int(c["ay"])),
+			int(c.get("alt", 0)),
+		)
+
+	stair_sprite.position = Vector2(stair_pos * TILE_SIZE)
+
+	player.floor_layer = floor_layer
+
+	var enemy_scene_path: String = config.enemy_scenes[0] if config.enemy_scenes.size() > 0 \
+		else "res://scenes/enemy/Enemy.tscn"
+	var enemy_scene = load(enemy_scene_path)
+	for ed in d.get("enemies", []):
+		var enemy = enemy_scene.instantiate()
+		add_child(enemy)
+		enemy.position = Vector2(int(ed["x"]) * TILE_SIZE, int(ed["y"]) * TILE_SIZE)
+		enemy.floor_layer = floor_layer
+		if "hp" in enemy and ed.has("hp"):
+			enemy.hp = int(ed["hp"])
+
+	var item_scene = load("res://scenes/item/Item.tscn")
+	for itd in d.get("items", []):
+		var item = item_scene.instantiate()
+		item.item_type = itd.get("type", "herb")
+		item.amount = int(itd.get("amount", 1))
+		add_child(item)
+		item.position = Vector2(int(itd["x"]) * TILE_SIZE, int(itd["y"]) * TILE_SIZE)
+
+	if map_view:
+		map_view.refresh(floor_layer, stair_pos, config.map_size,
+			"%s F%d" % [config.display_name, current_floor])
+
+	LogManager.add_log("中断していた %s 第 %d 階に戻った。" % [config.display_name, current_floor])

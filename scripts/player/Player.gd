@@ -172,6 +172,39 @@ func eat_food(amount: int) -> void:
 	hunger = min(max_hunger, hunger + amount)
 	hunger_changed.emit(hunger, max_hunger)
 
+# --- セーブ / ロード（SaveManager から呼ばれる） ---
+# docs/system/save.md 参照。
+
+func save_state() -> Dictionary:
+	return {
+		"tile_x": tile_pos.x,
+		"tile_y": tile_pos.y,
+		"facing": facing,
+		"in_village": in_village,
+		"hp": hp, "max_hp": max_hp,
+		"sp": sp, "max_sp": max_sp,
+		"hunger": hunger, "max_hunger": max_hunger,
+		"attack_power": attack_power,
+		"turns_in_dungeon": _turns_in_dungeon,
+	}
+
+func load_state(d: Dictionary) -> void:
+	tile_pos = Vector2i(int(d.get("tile_x", 0)), int(d.get("tile_y", 0)))
+	position = tile_to_world(tile_pos)
+	facing = int(d.get("facing", DIR_DOWN))
+	in_village = bool(d.get("in_village", false))
+	hp         = int(d.get("hp", 30))
+	max_hp     = int(d.get("max_hp", 30))
+	sp         = int(d.get("sp", 50))
+	max_sp     = int(d.get("max_sp", 100))
+	hunger     = int(d.get("hunger", 100))
+	max_hunger = int(d.get("max_hunger", 100))
+	attack_power = int(d.get("attack_power", 8))
+	_turns_in_dungeon = int(d.get("turns_in_dungeon", 0))
+	stats_changed.emit(hp, max_hp, sp, max_sp)
+	hunger_changed.emit(hunger, max_hunger)
+	_show_idle()
+
 func wait_in_place() -> void:
 	_step = (_step + 1) % 2
 	sprite.frame_coords = Vector2i(_step * 2, facing)

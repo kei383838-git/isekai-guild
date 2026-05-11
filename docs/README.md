@@ -16,6 +16,7 @@
 - system/village.md: 村と素材制作の確定仕様
 - system/asset_structure.md: アセットディレクトリの配置ルール
 - system/equipment.md: 装備スロットと持ち物との関係
+- system/save.md: セーブ・ロード仕様（通常 / 中断 / スロット）
 
 ## 現在の制作状況
 - 現在は基礎機能の実装と並行して、最初の村の作り込みを進めている

@@ -24,6 +24,7 @@ PlayerData="*res://scripts/systems/PlayerData.gd"
 PauseMenu="*res://scenes/ui/PauseMenu.tscn"
 KeyHelpOverlay="*res://scenes/ui/KeyHelpOverlay.tscn"
 DebugInput="*res://scripts/systems/DebugInput.gd"
+SaveManager="*res://scripts/systems/SaveManager.gd"
 
 [display]
 
