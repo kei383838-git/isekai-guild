@@ -1,4 +1,4 @@
-[gd_scene load_steps=2 format=3 uid="uid://c7y3qm9khelpz"]
+[gd_scene load_steps=2 format=3 uid="uid://c7y3qnakhelp0"]
 
 [ext_resource type="Script" path="res://scripts/ui/KeyHelpOverlay.gd" id="1_khelp"]
 
@@ -125,3 +125,11 @@ text = "E"
 [node name="V10" type="Label" parent="Panel/Margin/VBox/Grid"]
 layout_mode = 2
 text = "メニュー"
+
+[node name="K11" type="Label" parent="Panel/Margin/VBox/Grid"]
+layout_mode = 2
+text = "F12"
+
+[node name="V11" type="Label" parent="Panel/Margin/VBox/Grid"]
+layout_mode = 2
+text = "デバッグギャラリー"

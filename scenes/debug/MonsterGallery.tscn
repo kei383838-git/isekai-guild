@@ -1,0 +1,46 @@
+[gd_scene load_steps=2 format=3 uid="uid://devw5mxlemnva"]
+
+[ext_resource type="Script" uid="uid://ds3lkvg37da62" path="res://scripts/debug/MonsterGallery.gd" id="1_main"]
+
+[node name="MonsterGallery" type="Node2D"]
+script = ExtResource("1_main")
+
+[node name="Background" type="ColorRect" parent="."]
+offset_left = -512.0
+offset_top = -384.0
+offset_right = 1792.0
+offset_bottom = 1280.0
+mouse_filter = 2
+color = Color(0.08, 0.11, 0.08, 1)
+
+[node name="Camera2D" type="Camera2D" parent="."]
+position = Vector2(512, 384)
+zoom = Vector2(0.8, 0.8)
+
+[node name="SelectionMarker" type="Line2D" parent="."]
+visible = false
+points = PackedVector2Array(-4, -4, 68, -4, 68, 68, -4, 68, -4, -4)
+width = 3.0
+default_color = Color(1, 0.92, 0.2, 1)
+
+[node name="HUD" type="CanvasLayer" parent="."]
+
+[node name="TitleLabel" type="Label" parent="HUD"]
+offset_left = 16.0
+offset_top = 12.0
+offset_right = 1264.0
+offset_bottom = 40.0
+theme_override_colors/font_color = Color(1, 1, 0.6, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 4
+text = "[Debug] モンスター閲覧ギャラリー"
+
+[node name="KeyHelp" type="Label" parent="HUD"]
+offset_left = 16.0
+offset_top = 40.0
+offset_right = 1264.0
+offset_bottom = 80.0
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 4
+text = "[Tab] 切替   [Numpad1-9 / 矢印] 移動   [A] 攻撃   [H] 被弾   [K] 死亡   [R] リセット   [ESC] 帰還"
