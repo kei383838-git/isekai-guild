@@ -3,8 +3,31 @@ class_name Enemy
 
 const TILE_SIZE = 64
 
+const FRAME_IDLE := 0
+const FRAME_WALK_A := 1
+const FRAME_WALK_B := 2
+const FRAME_ATTACK_WINDUP := 3
+const FRAME_ATTACK_IMPACT := 4
+const FRAME_ATTACK_RECOVER := 5
+const FRAME_HURT := 6
+const FRAME_DEATH_A := 7
+const FRAME_DEATH_B := 8
+const FRAME_DEATH_C := 9
+
+const DIR_DOWN := 0
+const DIR_DOWN_LEFT := 1
+const DIR_LEFT := 2
+const DIR_UP_LEFT := 3
+const DIR_UP := 4
+const DIR_UP_RIGHT := 5
+const DIR_RIGHT := 6
+const DIR_DOWN_RIGHT := 7
+
 # 種別キー（QuestData.target_key と突き合わせる）
 @export var enemy_type: String = "slime"
+
+# 観察モード（デバッグギャラリー用）。false にすると act() が空動作になる。
+@export var ai_enabled: bool = true
 
 # ステータス
 var max_hp := 30
@@ -16,6 +39,9 @@ var attack_power := 5
 
 # 敵を識別しやすくするためのグループ名
 const GROUP_NAME = "enemies"
+
+var facing_row := DIR_DOWN
+var _walk_step := 0
 
 func _ready():
 	# グループに追加して TurnManager から見つけやすくする
@@ -53,20 +79,30 @@ func can_move(direction: Vector2) -> bool:
 		
 	return true
 
-# 向きに合わせてスプライトのフレームを更新 (Playerと同様の3x4シートを想定)
+# 向きに合わせてスプライトの行を更新する。
+# slime_beginner_64.png は 10列 x 8行、行順は Player.gd と同じ8方向。
 func update_sprite_direction(direction: Vector2):
-	if not sprite or not sprite.hframes: return
-	
-	var row = 0
-	if direction.y > 0: row = 0 # Down
-	elif direction.x < 0: row = 1 # Left
-	elif direction.x > 0: row = 2 # Right
-	elif direction.y < 0: row = 3 # Up
-	
-	sprite.frame = row * sprite.hframes + 1
+	var dx := int(sign(direction.x))
+	var dy := int(sign(direction.y))
+	match Vector2i(dx, dy):
+		Vector2i(0, 1): facing_row = DIR_DOWN
+		Vector2i(-1, 1): facing_row = DIR_DOWN_LEFT
+		Vector2i(-1, 0): facing_row = DIR_LEFT
+		Vector2i(-1, -1): facing_row = DIR_UP_LEFT
+		Vector2i(0, -1): facing_row = DIR_UP
+		Vector2i(1, -1): facing_row = DIR_UP_RIGHT
+		Vector2i(1, 0): facing_row = DIR_RIGHT
+		Vector2i(1, 1): facing_row = DIR_DOWN_RIGHT
+
+func set_anim_frame(column: int) -> void:
+	if not sprite:
+		return
+	sprite.frame_coords = Vector2i(column, facing_row)
 
 # 敵のターンに呼ばれる関数
 func act():
+	if not ai_enabled:
+		return
 	var player = get_tree().get_first_node_in_group("player")
 	if not player:
 		return
@@ -84,8 +120,25 @@ func act():
 
 func attack_player(player, direction: Vector2):
 	update_sprite_direction(direction)
-	print("Enemy attacks player for ", attack_power, " damage!")
-	player.take_damage(attack_power)
+	play_attack_motion()
+	get_tree().create_timer(0.08).timeout.connect(func():
+		player.take_damage(attack_power)
+	, CONNECT_ONE_SHOT)
+
+# ダメージ処理を伴わない攻撃モーションだけの再生（デバッグギャラリー兼用）。
+func play_attack_motion() -> void:
+	set_anim_frame(FRAME_ATTACK_WINDUP)
+	get_tree().create_timer(0.08).timeout.connect(func(): set_anim_frame(FRAME_ATTACK_IMPACT), CONNECT_ONE_SHOT)
+	get_tree().create_timer(0.16).timeout.connect(func(): set_anim_frame(FRAME_ATTACK_RECOVER), CONNECT_ONE_SHOT)
+	get_tree().create_timer(0.24).timeout.connect(func(): set_anim_frame(FRAME_IDLE), CONNECT_ONE_SHOT)
+
+# HP を変えない hurt モーションのみ（デバッグギャラリー用）。
+func play_hurt_motion() -> void:
+	set_anim_frame(FRAME_HURT)
+	var tween = create_tween()
+	tween.tween_property(sprite, "modulate", Color.RED, 0.1)
+	tween.tween_property(sprite, "modulate", Color.WHITE, 0.1)
+	get_tree().create_timer(0.16).timeout.connect(func(): set_anim_frame(FRAME_IDLE), CONNECT_ONE_SHOT)
 
 func move_towards_player(target_grid_pos: Vector2i):
 	var my_grid_pos = get_grid_pos(position)
@@ -109,13 +162,16 @@ func move_towards_player(target_grid_pos: Vector2i):
 	for move_dir in candidates:
 		if can_move(move_dir):
 			update_sprite_direction(move_dir)
+			_walk_step = 1 - _walk_step
+			set_anim_frame(FRAME_WALK_A if _walk_step == 0 else FRAME_WALK_B)
 			position += move_dir * TILE_SIZE
-			print("Enemy moved to: ", get_grid_pos(position))
+			get_tree().create_timer(0.2).timeout.connect(func(): set_anim_frame(FRAME_IDLE), CONNECT_ONE_SHOT)
 			return
 
 	# どこにも動けない場合でも、向きだけはプレイヤー方向に揃える
 	if optimal != Vector2.ZERO:
 		update_sprite_direction(optimal)
+		set_anim_frame(FRAME_IDLE)
 
 var is_dead := false
 
@@ -125,6 +181,7 @@ func take_damage(amount: int):
 	
 	hp -= amount
 	LogManager.add_log("敵に %d ダメージ！" % amount)
+	set_anim_frame(FRAME_HURT)
 	
 	# 被弾演出（一瞬赤くなる）
 	var tween = create_tween()
@@ -133,6 +190,8 @@ func take_damage(amount: int):
 	
 	if hp <= 0:
 		die()
+	else:
+		get_tree().create_timer(0.16).timeout.connect(func(): set_anim_frame(FRAME_IDLE), CONNECT_ONE_SHOT)
 
 func die():
 	if is_dead: return
@@ -145,6 +204,10 @@ func die():
 	# 判定から即座に除外（次のターンの行動や移動妨害を防ぐ）
 	remove_from_group(GROUP_NAME)
 	
+	set_anim_frame(FRAME_DEATH_A)
+	get_tree().create_timer(0.12).timeout.connect(func(): set_anim_frame(FRAME_DEATH_B), CONNECT_ONE_SHOT)
+	get_tree().create_timer(0.24).timeout.connect(func(): set_anim_frame(FRAME_DEATH_C), CONNECT_ONE_SHOT)
+
 	# 撃破演出（赤くなりながら消える）
 	var tween = create_tween()
 	tween.set_parallel(true)
