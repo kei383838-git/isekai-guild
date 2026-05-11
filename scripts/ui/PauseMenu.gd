@@ -304,7 +304,7 @@ func _on_drop_pressed() -> void:
 # ダンジョン中は menu を閉じてから 1 ターン進める。
 # 村では menu を開いたまま表示だけ更新（ターン消費なし、連続操作可能）。
 func _consume_turn_or_refresh() -> void:
-	var in_dungeon := _player != null and is_instance_valid(_player) and not _player.in_village
+	var in_dungeon: bool = _player != null and is_instance_valid(_player) and not _player.in_village
 	if in_dungeon:
 		close()
 		TurnManager.advance_turn()

@@ -5,7 +5,11 @@
 `assets/` 配下は **ドメイン（誰が使うか）で分ける**。
 ファイル名にドメインを含めても良いが、ディレクトリで明示するのを優先する。
 
-## 2. 現在の構造（2026-05-05 整理後）
+`assets/` には、現在ゲーム内で参照されている実使用ファイルだけを置く。
+検討段階の画像、生成プレビュー、比較用画像、配置参考、manifest、素材ストックは `work/` 配下へ置く。
+`work/` は `.gdignore` を置き、Godot のインポート対象から外す。
+
+## 2. 現在の構造（2026-05-08 整理後）
 
 ```
 assets/
@@ -15,25 +19,19 @@ assets/
 │   │       ├── forest_floor_tileset_v1.tres
 │   │       ├── forest_floor_tileset_v1_64.png
 │   │       ├── forest_wall_tileset_v2.tres
-│   │       ├── forest_wall_tileset_v2_64.png
-│   │       └── （preview / manifest / repeat_preview 等）
+│   │       └── forest_wall_tileset_v2_64.png
 │   ├── terrain.tres                    ← 村の TileSet（暫定。村は単一画像化を予定）
 │   ├── Road Tileset Generated *_64.png ← 村側で terrain.tres から参照
-│   ├── Road Tileset 1〜4.png           ← 素材ストック（未使用）
-│   └── Terrain Tileset 1〜10.png       ← 素材ストック（未使用）
 ├── characters/
 │   ├── player/                         ← プレイヤー用スプライト
-│   │   ├── mage_spritesheet.png        ← 現在の Player.tscn が使用中
-│   │   ├── warrior.png                 ← ストック
-│   │   └── warrior2.png                ← ストック
-│   ├── enemies/
-│   │   └── enemy.png                   ← 汎用ストック
-│   ├── slime_beginner_64.png           ← 現在の Enemy.tscn が使用中（Enemy.tscn 編集中のため未移動）
-│   └── 商人.png                        ← villager.tscn が使用中（村構造改修保留のため未移動）
-├── buildings/                          ← 村の建物画像
-├── ui/                                 ← UI 用素材
-├── props/                              ← 装飾オブジェクト
-├── backgrounds/                        ← 遠景・タイトル背景
+│   │   └── mage_spritesheet.png        ← 現在の Player.tscn が使用中
+│   ├── enemies/                        ← 敵キャラ用スプライト
+│   │   ├── slime_beginner_64.png       ← 現在の Enemy.tscn が使用中
+│   │   └── goblin_beginner_64.png      ← デバッグギャラリーで参照
+│   └── 商人.png                        ← villager.tscn が使用中
+├── buildings/                          ← 拠点の建物画像
+├── props/                              ← 現在シーンから参照されている装飾オブジェクト
+├── backgrounds/                        ← 現在シーンから参照されている背景
 ├── map/                                ← 地図画像
 └── sounds/                             ← サウンド類
 ```
@@ -60,22 +58,19 @@ assets/
 
 - 64px タイル想定なら接尾辞 `_64`（例：`forest_floor_tileset_v1_64.png`）
 - TileSet リソースは `*_tileset.tres`
-- バージョン違いは一時的に `_v1`, `_v2` で残しても良いが、確定したら **古い版を削除**して `_vN` を取り去る
-- マニフェスト（生成元情報など）は `*_manifest.json`
+- バージョン違いや比較用のプレビューは `assets/` に残さず `work/` へ置く
+- マニフェスト（生成元情報など）は `assets/` に置かず `work/` へ置く
 
 ## 4. 残作業（村関連）
 
-村は将来的に **ギルドと同じく 1 枚画像化** する予定があり、現状の以下は暫定状態：
+拠点は迷宮都市として再構築予定であり、現状の以下は暫定状態：
 
 - `assets/tilesets/terrain.tres`
 - `assets/tilesets/Road Tileset Generated *_64.png`
-- `assets/tilesets/Terrain Tileset 1〜10.png`
-- `assets/tilesets/Road Tileset 1〜4*.png`
 - `assets/characters/商人.png`
-- `assets/characters/slime_beginner_64*` （Enemy.tscn 編集中のため移動見送り）
 
-村が画像化されたら `terrain.tres` と Road / Terrain Tileset 群は不要になる。
-その時点で `tilesets/village/` を作って残るものを移動するか、丸ごと整理する。
+迷宮都市を正式に TileMap 化したら、`terrain.tres` と暫定 Road Tileset 群は不要になる可能性がある。
+その時点で `tilesets/village/` または `tilesets/city/` を作って、実使用ファイルだけを移動する。
 
 ## 5. クロスドメイン共有アセット
 
@@ -87,9 +82,11 @@ assets/
 `tilesets/dungeons/forest/` に移動し、village の `terrain.tres` は
 そのパスを跨いで参照する形に整えた（村は次回再構築時にこの依存を切る）。
 
-## 6. 削除前の必須チェック
+## 6. 退避・削除前の必須チェック
 
-アセットを削除する前に必ず参照確認を行う。詳細手順は `CLAUDE.md` を参照。
+アセットを退避・削除する前に必ず参照確認を行う。
+検討段階のファイルは削除ではなく `work/` へ移動する。
+現在の退避ログは `work/asset_cleanup_2026-05-08.json` に残す。
 
 > 2026-05-05：「ダンジョンの v1 壁は不要」とだけ判断して
 > `forest_wall_tileset_v1_*` を削除したところ、村の `terrain.tres` が
