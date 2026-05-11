@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://b00qalxvrod1m"
-path="res://.godot/imported/goblin_beginner_64.png-af0feec5183c85e8487b39213a9da483.ctex"
+uid="uid://mr44uhwvdqfn"
+path="res://.godot/imported/horned_rabbit_beginner_64.png-ec57b1684c858981dc447d982e615dee.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/characters/enemies/goblin_beginner_64.png"
-dest_files=["res://.godot/imported/goblin_beginner_64.png-af0feec5183c85e8487b39213a9da483.ctex"]
+source_file="res://assets/characters/enemies/horned_rabbit_beginner_64.png"
+dest_files=["res://.godot/imported/horned_rabbit_beginner_64.png-ec57b1684c858981dc447d982e615dee.ctex"]
 
 [params]
 
