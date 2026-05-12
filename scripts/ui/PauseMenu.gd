@@ -17,6 +17,7 @@ const MENU_TOGGLE_KEY := KEY_E
 # メニューボタン
 @onready var _btn_inventory: Button = $Panel/Margin/VBox/Body/MenuButtons/InventoryButton
 @onready var _btn_quest: Button     = $Panel/Margin/VBox/Body/MenuButtons/QuestButton
+@onready var _btn_save: Button      = $Panel/Margin/VBox/Body/MenuButtons/SaveButton
 @onready var _btn_settings: Button  = $Panel/Margin/VBox/Body/MenuButtons/SettingsButton
 @onready var _btn_suspend: Button   = $Panel/Margin/VBox/Body/MenuButtons/SuspendButton
 @onready var _btn_close: Button     = $Panel/Margin/VBox/Body/MenuButtons/CloseButton
@@ -71,11 +72,12 @@ func _ready() -> void:
 
 	_btn_inventory.pressed.connect(_show_inventory)
 	_btn_quest.pressed.connect(_show_quest)
+	_btn_save.pressed.connect(_on_save_pressed)
 	_btn_suspend.pressed.connect(_on_suspend_pressed)
 	_btn_close.pressed.connect(close)
 	# 設定は Phase 3 以降
 	_btn_settings.disabled = true
-	# 中断ボタンの enable/disable は open() 時に in_village + current_slot で判定する
+	# セーブ / 中断ボタンの enable は open() 時に in_village + current_slot で動的判定する
 
 	# アクションボタン接続。enable/disable は _refresh_action_buttons() で動的に変える
 	_btn_use.pressed.connect(_on_use_pressed)
@@ -116,6 +118,7 @@ func open() -> void:
 	# 中央コンテンツは空表示で開く。持ち物ボタンに初期フォーカスを当てる。
 	_show_empty()
 	_refresh_status()
+	_refresh_save_button()
 	_refresh_suspend_button()
 	_btn_inventory.grab_focus()
 
@@ -332,12 +335,33 @@ func _refresh_quest() -> void:
 	_quest_dungeon.text  = "行き先: " + dungeon_name
 	_quest_desc.text     = q.description
 
-# --- 中断 ---
+# --- セーブ / 中断 ---
+
+# セーブボタンの enable 条件：
+# - 拠点中（_player.in_village == true）
+# - スロットが選択されている（SaveManager.current_slot >= 1）
+func _refresh_save_button() -> void:
+	var enabled: bool = (
+		_player != null and is_instance_valid(_player)
+		and _player.in_village
+		and SaveManager.current_slot >= 1
+	)
+	_set_btn_enabled(_btn_save, enabled)
+
+func _on_save_pressed() -> void:
+	if SaveManager.current_slot < 1:
+		LogManager.add_log("スロットが選択されていないためセーブできない。")
+		return
+	if not SaveManager.save_normal(SaveManager.current_slot):
+		LogManager.add_log("セーブに失敗した。")
+		return
+	LogManager.add_log("セーブしました。")
 
 # 中断ボタンの enable 条件：
 # - ダンジョン中（_player.in_village == false）
 # - スロットが選択されている（SaveManager.current_slot >= 1）
-# 通常セーブ（村）は Phase B で実装。
+# 仕様上は階段マスでのみ可能（docs/system/save.md）。Phase A の動作確認用に
+# 現状はダンジョン中なら常に押せる。階段プロンプト化は B-3 で対応。
 func _refresh_suspend_button() -> void:
 	var enabled: bool = (
 		_player != null and is_instance_valid(_player)

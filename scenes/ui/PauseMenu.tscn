@@ -62,6 +62,12 @@ text = "持ち物"
 layout_mode = 2
 text = "クエスト"
 
+[node name="SaveButton" type="Button" parent="Panel/Margin/VBox/Body/MenuButtons"]
+layout_mode = 2
+focus_mode = 0
+disabled = true
+text = "セーブ"
+
 [node name="SettingsButton" type="Button" parent="Panel/Margin/VBox/Body/MenuButtons"]
 layout_mode = 2
 focus_mode = 0

@@ -39,13 +39,15 @@ func _setup_slot_row(slot: int, info_label: Label, action_button: Button) -> voi
 		action_button.pressed.connect(_on_new_pressed.bind(slot))
 		return
 
-	# 中断あり優先で表示（Phase A は normal が無いので必ず suspend 系）
+	# ロード時は中断 → 通常 の優先で読まれるため、表示も同じ優先で出す。
+	# 両方ある場合は中断側に「通常もあり」の注記を添える。
 	if info.get("has_suspend", false):
 		var dungeon_id: String = info.get("suspend_dungeon_id", "")
 		var dungeon_name: String = SAVE_DIR_LABELS.get(dungeon_id, dungeon_id)
 		var floor_n: int = info.get("suspend_floor", 0)
 		var saved_at: String = info.get("suspend_saved_at", "")
-		info_label.text = "中断: %s F%d   %s" % [dungeon_name, floor_n, saved_at]
+		var normal_note: String = "  (通常もあり)" if info.get("has_normal", false) else ""
+		info_label.text = "中断: %s F%d   %s%s" % [dungeon_name, floor_n, saved_at, normal_note]
 		action_button.text = "続きから"
 		action_button.pressed.connect(_on_load_pressed.bind(slot))
 	elif info.get("has_normal", false):
