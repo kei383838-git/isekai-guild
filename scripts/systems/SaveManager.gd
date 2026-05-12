@@ -61,10 +61,34 @@ func save_suspend(slot: int) -> bool:
 	}
 	return _write_slot(slot, data)
 
-# 通常セーブ（Phase B で実装予定）
+# 通常セーブ。拠点（村など）に居る間に呼ぶ前提。
+# 同スロットの中断セーブには影響しない（suspend セクションは保持）。
+# 現在のシーンパスを記録するため、村以外（Guild 等）から呼ばれても
+# そのシーンに復帰できるようにしている。
 func save_normal(slot: int) -> bool:
-	push_warning("SaveManager.save_normal: Phase B で実装予定。")
-	return false
+	if slot < 1 or slot > SLOT_COUNT:
+		push_warning("SaveManager.save_normal: 不正なスロット %d" % slot)
+		return false
+	var player = _find_player()
+	if player == null:
+		push_warning("SaveManager.save_normal: Player が見つからない。")
+		return false
+
+	var scene_path := "res://scenes/main/Village.tscn"
+	var current := get_tree().current_scene
+	if current != null and current.scene_file_path != "":
+		scene_path = current.scene_file_path
+
+	var data := _read_slot(slot)
+	data["version"] = SAVE_VERSION
+	data["normal"] = {
+		"saved_at": Time.get_datetime_string_from_system(),
+		"scene": scene_path,
+		"player_data": _snapshot_player_data(),
+		"quest_manager": _snapshot_quest_manager(),
+		"player": player.save_state(),
+	}
+	return _write_slot(slot, data)
 
 # --- ロード ---
 

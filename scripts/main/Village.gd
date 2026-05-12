@@ -10,6 +10,12 @@ func _ready():
 		player.in_village = true
 		_apply_camera_limits()
 	TurnManager.enemy_turn_started.connect(_on_player_action_finished)
+	# 村到着時の自動セーブ（docs/system/save.md 5 節）。
+	# 新規ゲーム開始 / ダンジョン帰還 / 死亡帰還いずれの場合もここを通る。
+	# スロット未選択（エディタから直接 Village を開いた等）はスキップ。
+	if SaveManager.current_slot >= 1:
+		if SaveManager.save_normal(SaveManager.current_slot):
+			LogManager.add_log("オートセーブしました。")
 
 func _apply_camera_limits() -> void:
 	if background == null or background.texture == null:
