@@ -14,13 +14,23 @@ extends CanvasLayer
 
 const MENU_TOGGLE_KEY := KEY_E
 
+# メニュー本体
+@onready var _main_panel: Panel = $Panel
+
 # メニューボタン
 @onready var _btn_inventory: Button = $Panel/Margin/VBox/Body/MenuButtons/InventoryButton
 @onready var _btn_quest: Button     = $Panel/Margin/VBox/Body/MenuButtons/QuestButton
 @onready var _btn_save: Button      = $Panel/Margin/VBox/Body/MenuButtons/SaveButton
 @onready var _btn_settings: Button  = $Panel/Margin/VBox/Body/MenuButtons/SettingsButton
 @onready var _btn_suspend: Button   = $Panel/Margin/VBox/Body/MenuButtons/SuspendButton
+@onready var _btn_return: Button    = $Panel/Margin/VBox/Body/MenuButtons/ReturnToTitleButton
 @onready var _btn_close: Button     = $Panel/Margin/VBox/Body/MenuButtons/CloseButton
+
+# 確認ダイアログ（セーブ後の継続確認、タイトル戻り確認で共有）
+@onready var _dialog: Panel        = $ConfirmDialog
+@onready var _dialog_msg: Label    = $ConfirmDialog/Margin/VBox/MessageLabel
+@onready var _dialog_ok: Button    = $ConfirmDialog/Margin/VBox/Buttons/OkButton
+@onready var _dialog_cancel: Button = $ConfirmDialog/Margin/VBox/Buttons/CancelButton
 
 # 中央コンテンツ切替
 @onready var _empty_view: Label         = $Panel/Margin/VBox/Body/EmptyView
@@ -66,6 +76,11 @@ const MENU_TOGGLE_KEY := KEY_E
 var _player: Node = null
 var _selected_item_key: String = ""
 
+# 確認ダイアログのモード。
+# "continue_after_save": セーブ直後に「ゲームを続けますか？」を尋ねる
+# "confirm_return":      「タイトルに戻る」ボタン押下時の確認
+var _dialog_mode: String = ""
+
 func _ready() -> void:
 	_register_input_action()
 	hide()
@@ -74,10 +89,15 @@ func _ready() -> void:
 	_btn_quest.pressed.connect(_show_quest)
 	_btn_save.pressed.connect(_on_save_pressed)
 	_btn_suspend.pressed.connect(_on_suspend_pressed)
+	_btn_return.pressed.connect(_on_return_to_title_pressed)
 	_btn_close.pressed.connect(close)
+	# 確認ダイアログ
+	_dialog_ok.pressed.connect(_on_dialog_ok)
+	_dialog_cancel.pressed.connect(_on_dialog_cancel)
 	# 設定は Phase 3 以降
 	_btn_settings.disabled = true
-	# セーブ / 中断ボタンの enable は open() 時に in_village + current_slot で動的判定する
+	# セーブ / 中断 / タイトルに戻る の enable は open() 時に
+	# in_village + current_slot で動的判定する
 
 	# アクションボタン接続。enable/disable は _refresh_action_buttons() で動的に変える
 	_btn_use.pressed.connect(_on_use_pressed)
@@ -115,14 +135,23 @@ func open() -> void:
 		return
 	show()
 	get_tree().paused = true
+	# 開き直し時にダイアログが残らないように初期化
+	_dialog.hide()
+	_main_panel.show()
+	_dialog_mode = ""
 	# 中央コンテンツは空表示で開く。持ち物ボタンに初期フォーカスを当てる。
 	_show_empty()
 	_refresh_status()
 	_refresh_save_button()
+	_refresh_return_button()
 	_refresh_suspend_button()
 	_btn_inventory.grab_focus()
 
 func close() -> void:
+	# ダイアログが開いていた状態でも閉じれるよう、両方クリーンにする
+	_dialog.hide()
+	_main_panel.show()
+	_dialog_mode = ""
 	hide()
 	get_tree().paused = false
 
@@ -356,6 +385,33 @@ func _on_save_pressed() -> void:
 		LogManager.add_log("セーブに失敗した。")
 		return
 	LogManager.add_log("セーブしました。")
+	# セーブ完了後、続けるかタイトルに戻るかを尋ねる
+	_show_dialog(
+		"continue_after_save",
+		"セーブしました。\nゲームを続けますか？",
+		"続ける",
+		"タイトルに戻る",
+	)
+
+# 「タイトルに戻る」ボタンの enable 条件：
+# - 拠点中（_player.in_village == true）
+# - スロットが選択されている（SaveManager.current_slot >= 1）
+# 押下で確認ダイアログ → セーブ + タイトル遷移。
+func _refresh_return_button() -> void:
+	var enabled: bool = (
+		_player != null and is_instance_valid(_player)
+		and _player.in_village
+		and SaveManager.current_slot >= 1
+	)
+	_set_btn_enabled(_btn_return, enabled)
+
+func _on_return_to_title_pressed() -> void:
+	_show_dialog(
+		"confirm_return",
+		"セーブしてタイトルに戻ります。\nよろしいですか？",
+		"はい",
+		"いいえ",
+	)
 
 # 中断ボタンの enable 条件：
 # - ダンジョン中（_player.in_village == false）
@@ -380,6 +436,48 @@ func _on_suspend_pressed() -> void:
 	LogManager.add_log("中断した。")
 	close()
 	get_tree().change_scene_to_file("res://scenes/ui/TitleScreen.tscn")
+
+# --- 確認ダイアログ（共有） ---
+
+func _show_dialog(mode: String, msg: String, ok_text: String, cancel_text: String) -> void:
+	_dialog_mode = mode
+	_dialog_msg.text = msg
+	_dialog_ok.text = ok_text
+	_dialog_cancel.text = cancel_text
+	_main_panel.hide()
+	_dialog.show()
+	_dialog_ok.grab_focus()
+
+func _close_dialog() -> void:
+	_dialog.hide()
+	_main_panel.show()
+	_dialog_mode = ""
+
+func _on_dialog_ok() -> void:
+	var mode := _dialog_mode
+	_close_dialog()
+	match mode:
+		"continue_after_save":
+			# 「続ける」= メニューに戻る
+			_btn_inventory.grab_focus()
+		"confirm_return":
+			# 「はい」= セーブしてタイトルへ
+			if SaveManager.current_slot >= 1:
+				SaveManager.save_normal(SaveManager.current_slot)
+			close()
+			get_tree().change_scene_to_file("res://scenes/ui/TitleScreen.tscn")
+
+func _on_dialog_cancel() -> void:
+	var mode := _dialog_mode
+	_close_dialog()
+	match mode:
+		"continue_after_save":
+			# 「タイトルに戻る」= セーブは済んでいるのでそのままタイトルへ
+			close()
+			get_tree().change_scene_to_file("res://scenes/ui/TitleScreen.tscn")
+		"confirm_return":
+			# 「いいえ」= メニューに戻る
+			_btn_return.grab_focus()
 
 # --- ステータスフッター ---
 
