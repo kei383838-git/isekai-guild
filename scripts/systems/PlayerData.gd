@@ -73,7 +73,10 @@ func clear_inventory() -> void:
 # --- equipment ---
 
 # kind から対応スロットを返す。装備不可の kind は空文字を返す。
-static func slot_for_kind(kind: int) -> String:
+# Autoload インスタンス経由で呼ばれる前提のため非 static にしている
+# （static にすると PauseMenu.gd 等の呼び出しで STATIC_CALLED_ON_INSTANCE
+# 警告が出るため）。
+func slot_for_kind(kind: int) -> String:
 	match kind:
 		Item.Kind.WEAPON:    return SLOT_WEAPON
 		Item.Kind.SHIELD:    return SLOT_SHIELD

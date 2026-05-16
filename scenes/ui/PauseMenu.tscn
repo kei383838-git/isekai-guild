@@ -70,8 +70,6 @@ text = "セーブ"
 
 [node name="SettingsButton" type="Button" parent="Panel/Margin/VBox/Body/MenuButtons"]
 layout_mode = 2
-focus_mode = 0
-disabled = true
 text = "設定"
 
 [node name="ReturnToTitleButton" type="Button" parent="Panel/Margin/VBox/Body/MenuButtons"]
@@ -202,6 +200,32 @@ size_flags_horizontal = 3
 focus_mode = 0
 disabled = true
 text = "捨てる"
+
+[node name="SettingsView" type="VBoxContainer" parent="Panel/Margin/VBox/Body"]
+visible = false
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_constants/separation = 10
+
+[node name="TitleLabel" type="Label" parent="Panel/Margin/VBox/Body/SettingsView"]
+layout_mode = 2
+text = "設定"
+
+[node name="HSep" type="HSeparator" parent="Panel/Margin/VBox/Body/SettingsView"]
+layout_mode = 2
+
+[node name="ShowHelpCheck" type="CheckBox" parent="Panel/Margin/VBox/Body/SettingsView"]
+layout_mode = 2
+text = "操作ヘルプを画面右上に表示する"
+
+[node name="FullscreenCheck" type="CheckBox" parent="Panel/Margin/VBox/Body/SettingsView"]
+layout_mode = 2
+text = "全画面表示"
+
+[node name="AutoSaveCheck" type="CheckBox" parent="Panel/Margin/VBox/Body/SettingsView"]
+layout_mode = 2
+text = "村到着時に自動セーブする"
 
 [node name="QuestView" type="VBoxContainer" parent="Panel/Margin/VBox/Body"]
 visible = false

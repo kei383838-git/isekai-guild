@@ -35,6 +35,12 @@ const MENU_TOGGLE_KEY := KEY_E
 @onready var _empty_view: Label         = $Panel/Margin/VBox/Body/EmptyView
 @onready var _inventory_view: Container = $Panel/Margin/VBox/Body/InventoryView
 @onready var _quest_view: Container     = $Panel/Margin/VBox/Body/QuestView
+@onready var _settings_view: Container  = $Panel/Margin/VBox/Body/SettingsView
+
+# 設定 CheckBox
+@onready var _chk_show_help:  CheckBox = $Panel/Margin/VBox/Body/SettingsView/ShowHelpCheck
+@onready var _chk_fullscreen: CheckBox = $Panel/Margin/VBox/Body/SettingsView/FullscreenCheck
+@onready var _chk_auto_save:  CheckBox = $Panel/Margin/VBox/Body/SettingsView/AutoSaveCheck
 
 # 持ち物（左カラム）
 @onready var _equip_summary: Label     = $Panel/Margin/VBox/Body/InventoryView/LeftCol/EquipSummary
@@ -90,14 +96,17 @@ func _ready() -> void:
 
 	_btn_inventory.pressed.connect(_show_inventory)
 	_btn_quest.pressed.connect(_show_quest)
+	_btn_settings.pressed.connect(_show_settings)
 	_btn_save.pressed.connect(_on_save_pressed)
 	_btn_return.pressed.connect(_on_return_to_title_pressed)
 	_btn_close.pressed.connect(close)
 	# 確認ダイアログ
 	_dialog_ok.pressed.connect(_on_dialog_ok)
 	_dialog_cancel.pressed.connect(_on_dialog_cancel)
-	# 設定は Phase 3 以降
-	_btn_settings.disabled = true
+	# 設定 CheckBox
+	_chk_show_help.toggled.connect(_on_show_help_toggled)
+	_chk_fullscreen.toggled.connect(_on_fullscreen_toggled)
+	_chk_auto_save.toggled.connect(_on_auto_save_toggled)
 	# セーブ / タイトルに戻る の enable は open() 時に
 	# in_village + current_slot で動的判定する
 
@@ -171,18 +180,44 @@ func _show_empty() -> void:
 	_empty_view.show()
 	_inventory_view.hide()
 	_quest_view.hide()
+	_settings_view.hide()
 
 func _show_inventory() -> void:
 	_empty_view.hide()
 	_inventory_view.show()
 	_quest_view.hide()
+	_settings_view.hide()
 	_refresh_inventory()
 
 func _show_quest() -> void:
 	_empty_view.hide()
 	_inventory_view.hide()
 	_quest_view.show()
+	_settings_view.hide()
 	_refresh_quest()
+
+func _show_settings() -> void:
+	_empty_view.hide()
+	_inventory_view.hide()
+	_quest_view.hide()
+	_settings_view.show()
+	_refresh_settings()
+
+# 設定値（SettingsManager）と CheckBox 表示を同期する。
+# toggled シグナルが連鎖発火しないよう set_pressed_no_signal を使う。
+func _refresh_settings() -> void:
+	_chk_show_help.set_pressed_no_signal(SettingsManager.show_help)
+	_chk_fullscreen.set_pressed_no_signal(SettingsManager.fullscreen)
+	_chk_auto_save.set_pressed_no_signal(SettingsManager.auto_save)
+
+func _on_show_help_toggled(v: bool) -> void:
+	SettingsManager.set_show_help(v)
+
+func _on_fullscreen_toggled(v: bool) -> void:
+	SettingsManager.set_fullscreen(v)
+
+func _on_auto_save_toggled(v: bool) -> void:
+	SettingsManager.set_auto_save(v)
 
 # --- インベントリ ---
 

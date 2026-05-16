@@ -17,6 +17,7 @@
 - system/asset_structure.md: アセットディレクトリの配置ルール
 - system/equipment.md: 装備スロットと持ち物との関係
 - system/save.md: セーブ・ロード仕様（通常 / 中断 / スロット）
+- system/settings.md: ユーザー設定（操作ヘルプ表示 / 全画面 / 自動セーブ）
 
 ## 現在の制作状況
 - 現在は基礎機能の実装と並行して、最初の村の作り込みを進めている

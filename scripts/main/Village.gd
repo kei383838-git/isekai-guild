@@ -13,7 +13,8 @@ func _ready():
 	# 村到着時の自動セーブ（docs/system/save.md 5 節）。
 	# 新規ゲーム開始 / ダンジョン帰還 / 死亡帰還いずれの場合もここを通る。
 	# スロット未選択（エディタから直接 Village を開いた等）はスキップ。
-	if SaveManager.current_slot >= 1:
+	# 設定で auto_save が OFF なら実行しない（docs/system/settings.md）。
+	if SaveManager.current_slot >= 1 and SettingsManager.auto_save:
 		if SaveManager.save_normal(SaveManager.current_slot):
 			LogManager.add_log("オートセーブしました。")
 
