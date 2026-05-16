@@ -27,3 +27,61 @@ z_index = -5
 [node name="HUD" parent="." instance=ExtResource("3_hud")]
 
 [node name="MapView" parent="." instance=ExtResource("4_mapview")]
+
+[node name="StairPrompt" type="CanvasLayer" parent="."]
+process_mode = 3
+layer = 50
+visible = false
+
+[node name="Dim" type="ColorRect" parent="StairPrompt"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0, 0, 0, 0.55)
+mouse_filter = 0
+
+[node name="Panel" type="Panel" parent="StairPrompt"]
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -240.0
+offset_top = -130.0
+offset_right = 240.0
+offset_bottom = 130.0
+
+[node name="Margin" type="MarginContainer" parent="StairPrompt/Panel"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+theme_override_constants/margin_left = 24
+theme_override_constants/margin_top = 24
+theme_override_constants/margin_right = 24
+theme_override_constants/margin_bottom = 24
+
+[node name="VBox" type="VBoxContainer" parent="StairPrompt/Panel/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 14
+
+[node name="MessageLabel" type="Label" parent="StairPrompt/Panel/Margin/VBox"]
+layout_mode = 2
+horizontal_alignment = 1
+autowrap_mode = 2
+text = "階段がある。次の階に進みますか？"
+
+[node name="Buttons" type="VBoxContainer" parent="StairPrompt/Panel/Margin/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="DescendButton" type="Button" parent="StairPrompt/Panel/Margin/VBox/Buttons"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 36)
+text = "次の階へ進む"
+
+[node name="SuspendButton" type="Button" parent="StairPrompt/Panel/Margin/VBox/Buttons"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 36)
+text = "中断する"
+
+[node name="CancelButton" type="Button" parent="StairPrompt/Panel/Margin/VBox/Buttons"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 36)
+text = "やめる"

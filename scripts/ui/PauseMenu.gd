@@ -22,7 +22,6 @@ const MENU_TOGGLE_KEY := KEY_E
 @onready var _btn_quest: Button     = $Panel/Margin/VBox/Body/MenuButtons/QuestButton
 @onready var _btn_save: Button      = $Panel/Margin/VBox/Body/MenuButtons/SaveButton
 @onready var _btn_settings: Button  = $Panel/Margin/VBox/Body/MenuButtons/SettingsButton
-@onready var _btn_suspend: Button   = $Panel/Margin/VBox/Body/MenuButtons/SuspendButton
 @onready var _btn_return: Button    = $Panel/Margin/VBox/Body/MenuButtons/ReturnToTitleButton
 @onready var _btn_close: Button     = $Panel/Margin/VBox/Body/MenuButtons/CloseButton
 
@@ -81,6 +80,10 @@ var _selected_item_key: String = ""
 # "confirm_return":      「タイトルに戻る」ボタン押下時の確認
 var _dialog_mode: String = ""
 
+# 階段プロンプト等の上位ダイアログが開いている時、メニューを開けないようにする。
+# Dungeon.gd 等から set_blocked(true/false) で制御する。
+var _is_blocked: bool = false
+
 func _ready() -> void:
 	_register_input_action()
 	hide()
@@ -88,7 +91,6 @@ func _ready() -> void:
 	_btn_inventory.pressed.connect(_show_inventory)
 	_btn_quest.pressed.connect(_show_quest)
 	_btn_save.pressed.connect(_on_save_pressed)
-	_btn_suspend.pressed.connect(_on_suspend_pressed)
 	_btn_return.pressed.connect(_on_return_to_title_pressed)
 	_btn_close.pressed.connect(close)
 	# 確認ダイアログ
@@ -96,7 +98,7 @@ func _ready() -> void:
 	_dialog_cancel.pressed.connect(_on_dialog_cancel)
 	# 設定は Phase 3 以降
 	_btn_settings.disabled = true
-	# セーブ / 中断 / タイトルに戻る の enable は open() 時に
+	# セーブ / タイトルに戻る の enable は open() 時に
 	# in_village + current_slot で動的判定する
 
 	# アクションボタン接続。enable/disable は _refresh_action_buttons() で動的に変える
@@ -118,9 +120,17 @@ func _register_input_action() -> void:
 		InputMap.action_add_event("menu_toggle", ev)
 
 func _unhandled_input(event: InputEvent) -> void:
+	if _is_blocked:
+		return
 	if event.is_action_pressed("menu_toggle"):
 		toggle()
 		get_viewport().set_input_as_handled()
+
+# 階段プロンプト等から呼ばれる：true の間はメニューを開けない（既に開いていれば閉じる）。
+func set_blocked(b: bool) -> void:
+	_is_blocked = b
+	if b and visible:
+		close()
 
 func toggle() -> void:
 	if visible:
@@ -129,6 +139,9 @@ func toggle() -> void:
 		open()
 
 func open() -> void:
+	# 上位ダイアログ（階段プロンプト等）が開いている時は開かない
+	if _is_blocked:
+		return
 	# プレイヤーが居ないシーン（タイトル等）では開かない
 	_player = get_tree().get_first_node_in_group("player")
 	if _player == null:
@@ -144,7 +157,6 @@ func open() -> void:
 	_refresh_status()
 	_refresh_save_button()
 	_refresh_return_button()
-	_refresh_suspend_button()
 	_btn_inventory.grab_focus()
 
 func close() -> void:
@@ -413,29 +425,8 @@ func _on_return_to_title_pressed() -> void:
 		"いいえ",
 	)
 
-# 中断ボタンの enable 条件：
-# - ダンジョン中（_player.in_village == false）
-# - スロットが選択されている（SaveManager.current_slot >= 1）
-# 仕様上は階段マスでのみ可能（docs/system/save.md）。Phase A の動作確認用に
-# 現状はダンジョン中なら常に押せる。階段プロンプト化は B-3 で対応。
-func _refresh_suspend_button() -> void:
-	var enabled: bool = (
-		_player != null and is_instance_valid(_player)
-		and not _player.in_village
-		and SaveManager.current_slot >= 1
-	)
-	_set_btn_enabled(_btn_suspend, enabled)
-
-func _on_suspend_pressed() -> void:
-	if SaveManager.current_slot < 1:
-		LogManager.add_log("スロットが選択されていないため中断できない。")
-		return
-	if not SaveManager.save_suspend(SaveManager.current_slot):
-		LogManager.add_log("中断セーブに失敗した。")
-		return
-	LogManager.add_log("中断した。")
-	close()
-	get_tree().change_scene_to_file("res://scenes/ui/TitleScreen.tscn")
+# （中断はメニューから廃止。ダンジョン内の階段マスでのみ可能：
+#   docs/system/save.md / Dungeon.gd の階段プロンプトを参照）
 
 # --- 確認ダイアログ（共有） ---
 

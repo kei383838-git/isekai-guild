@@ -14,6 +14,13 @@ const FALLBACK_CONFIG_PATH = "res://data/dungeons/forest_beginner.tres"
 @onready var player = $Player
 @onready var map_view = $MapView
 
+# 階段マスでのプロンプト（B-3）
+@onready var _stair_prompt: CanvasLayer = $StairPrompt
+@onready var _stair_msg: Label    = $StairPrompt/Panel/Margin/VBox/MessageLabel
+@onready var _stair_btn_descend: Button = $StairPrompt/Panel/Margin/VBox/Buttons/DescendButton
+@onready var _stair_btn_suspend: Button = $StairPrompt/Panel/Margin/VBox/Buttons/SuspendButton
+@onready var _stair_btn_cancel: Button  = $StairPrompt/Panel/Margin/VBox/Buttons/CancelButton
+
 var config: DungeonConfig
 var generator := DungeonGenerator.new()
 var current_floor := 1
@@ -21,19 +28,41 @@ var stair_pos := Vector2i(-1, -1)
 var stair_sprite: Sprite2D
 var is_transitioning := false
 
+# 階段プロンプト状態
+var _stair_prompt_open: bool = false
+# 「やめる」を選んだ後、階段マスから離れるまで再表示しないためのフラグ
+var _stair_prompt_dismissed: bool = false
+
 func _ready() -> void:
 	_register_input_actions()
+	# 階段プロンプト
+	_stair_btn_descend.pressed.connect(_on_stair_descend)
+	_stair_btn_suspend.pressed.connect(_on_stair_suspend)
+	_stair_btn_cancel.pressed.connect(_on_stair_cancel)
+
 	# 中断ロード経路：SaveManager から pending_dungeon が来ていれば、
-	# 通常生成の代わりに保存されたフロアを復元する。
+	# 中断した階の **次の階** から開始する（中断は階段マスでの選択なので、
+	# 復帰時に保存時点へ戻すのではなく「次の階に進んだ状態」で再開する）。
+	# ダンジョンの cell / 敵 / アイテムは保存しないため新規生成する。
 	var pending := SaveManager.consume_pending_dungeon()
 	if not pending.is_empty():
 		config = _config_from_id(pending.get("config_id", ""))
 		_apply_appearance()
 		_setup_stair_visual()
-		load_dungeon_state(pending)
+		# Player ステータス（HP/SP/満腹度等）の復元はこのタイミングで行う。
+		# tile_pos も入っているが、_generate_new_floor で上書きされる。
 		var pp := SaveManager.consume_pending_player()
 		if not pp.is_empty():
 			player.load_state(pp)
+		var saved_floor: int = int(pending.get("current_floor", 1))
+		var resume_floor: int = saved_floor + 1
+		if resume_floor > config.floor_count:
+			# 最深部の階段で中断していた → 復帰=ダンジョンを出る
+			LogManager.add_log("中断ポイントから %s を踏破して戻る。" % config.display_name)
+			_return_to_base()
+		else:
+			current_floor = resume_floor
+			_generate_new_floor()  # 「F%d に到達」ログはここで出る
 	else:
 		config = _resolve_config()
 		_apply_appearance()
@@ -154,6 +183,8 @@ func _generate_new_floor() -> void:
 	# 階段配置
 	stair_pos = generator.get_stair_pos(floor_cells)
 	stair_sprite.position = Vector2(stair_pos * TILE_SIZE)
+	# 新フロアでは階段プロンプトを再び有効化（前フロアで「やめる」したフラグを解除）
+	_stair_prompt_dismissed = false
 
 	LogManager.add_log("%s 第 %d 階に到達。" % [config.display_name, current_floor])
 
@@ -165,10 +196,15 @@ func _generate_new_floor() -> void:
 	get_tree().create_timer(0.5).timeout.connect(func(): is_transitioning = false)
 
 func _on_player_action_finished() -> void:
-	if is_transitioning:
+	if is_transitioning or _stair_prompt_open:
 		return
 	if player.tile_pos == stair_pos:
-		_on_reach_stair()
+		# 「やめる」した後は、階段から離れるまで再表示しない
+		if not _stair_prompt_dismissed:
+			_show_stair_prompt()
+	else:
+		# 階段マスから離れたら、再び乗った時にプロンプトを出すよう dismiss を解除
+		_stair_prompt_dismissed = false
 
 func _on_reach_stair() -> void:
 	if is_transitioning:
@@ -190,6 +226,54 @@ func _unhandled_input(event: InputEvent) -> void:
 	# ESC で帰還（通常ダンジョンのみ）
 	if event.is_action_pressed("ui_cancel") and config.allow_return:
 		_return_to_base()
+
+# --- 階段プロンプト（B-3） ---
+
+func _show_stair_prompt() -> void:
+	_stair_prompt_open = true
+	# 最深部かどうかで文言とボタンラベルを切替
+	if current_floor >= config.floor_count:
+		_stair_msg.text = "ダンジョン最深部の出口だ。\nダンジョンを出ますか？"
+		_stair_btn_descend.text = "ダンジョンを出る"
+	else:
+		_stair_msg.text = "階段がある。\n次の階に進みますか？"
+		_stair_btn_descend.text = "次の階へ進む"
+	# 中断はスロット未選択時 disable
+	var slot_ok: bool = SaveManager.current_slot >= 1
+	_stair_btn_suspend.disabled = not slot_ok
+	_stair_btn_suspend.focus_mode = Control.FOCUS_ALL if slot_ok else Control.FOCUS_NONE
+	# プロンプト表示中はメニューを開けないようにブロックする
+	PauseMenu.set_blocked(true)
+	_stair_prompt.show()
+	_stair_btn_descend.grab_focus()
+	get_tree().paused = true
+
+func _close_stair_prompt() -> void:
+	_stair_prompt_open = false
+	_stair_prompt.hide()
+	get_tree().paused = false
+	PauseMenu.set_blocked(false)
+
+func _on_stair_descend() -> void:
+	_close_stair_prompt()
+	# 既存の階段降下処理を経由（最深部なら踏破して帰還、それ以外は次階生成）
+	_on_reach_stair()
+
+func _on_stair_suspend() -> void:
+	if SaveManager.current_slot < 1:
+		# ボタン disabled されているはずだが念のため
+		return
+	if not SaveManager.save_suspend(SaveManager.current_slot):
+		LogManager.add_log("中断セーブに失敗した。")
+		_close_stair_prompt()
+		return
+	LogManager.add_log("中断した。")
+	_close_stair_prompt()
+	get_tree().change_scene_to_file("res://scenes/ui/TitleScreen.tscn")
+
+func _on_stair_cancel() -> void:
+	_stair_prompt_dismissed = true
+	_close_stair_prompt()
 
 func _return_to_base() -> void:
 	var ret: String = config.return_scene if config.return_scene != "" \
@@ -254,108 +338,13 @@ func _loss_rate_for_difficulty(d: int) -> float:
 		3: return 1.0
 	return 0.0
 
-# --- セーブ / ロード（SaveManager から呼ばれる） ---
+# --- セーブ（SaveManager から呼ばれる） ---
 # docs/system/save.md 参照。
+# 中断は階段マスで行うため、ダンジョン内部状態（cell / 敵 / アイテム）は
+# 保存しない。復帰時は current_floor + 1 階を新規生成する。
 
 func save_dungeon_state() -> Dictionary:
-	var floor_cells := []
-	for c in floor_layer.get_used_cells():
-		floor_cells.append({
-			"x": c.x, "y": c.y,
-			"src": floor_layer.get_cell_source_id(c),
-			"ax": floor_layer.get_cell_atlas_coords(c).x,
-			"ay": floor_layer.get_cell_atlas_coords(c).y,
-			"alt": floor_layer.get_cell_alternative_tile(c),
-		})
-	var wall_cells := []
-	for c in wall_layer.get_used_cells():
-		wall_cells.append({
-			"x": c.x, "y": c.y,
-			"src": wall_layer.get_cell_source_id(c),
-			"ax": wall_layer.get_cell_atlas_coords(c).x,
-			"ay": wall_layer.get_cell_atlas_coords(c).y,
-			"alt": wall_layer.get_cell_alternative_tile(c),
-		})
-	var enemies := []
-	for e in get_tree().get_nodes_in_group("enemies"):
-		if not is_instance_valid(e):
-			continue
-		var et := Vector2i(round(e.position.x / TILE_SIZE), round(e.position.y / TILE_SIZE))
-		var ehp: int = e.hp if "hp" in e else 0
-		enemies.append({"x": et.x, "y": et.y, "hp": ehp})
-	var items := []
-	for it in get_tree().get_nodes_in_group("items"):
-		if not is_instance_valid(it):
-			continue
-		var itp := Vector2i(round(it.position.x / TILE_SIZE), round(it.position.y / TILE_SIZE))
-		items.append({
-			"x": itp.x, "y": itp.y,
-			"type": it.item_type,
-			"amount": it.amount,
-		})
 	return {
 		"config_id": config.id,
 		"current_floor": current_floor,
-		"stair_x": stair_pos.x,
-		"stair_y": stair_pos.y,
-		"floor_cells": floor_cells,
-		"wall_cells": wall_cells,
-		"enemies": enemies,
-		"items": items,
 	}
-
-func load_dungeon_state(d: Dictionary) -> void:
-	current_floor = int(d.get("current_floor", 1))
-	stair_pos = Vector2i(int(d.get("stair_x", 0)), int(d.get("stair_y", 0)))
-
-	# 念のため既存の敵・アイテムをクリア
-	for e in get_tree().get_nodes_in_group("enemies"):
-		e.queue_free()
-	for it in get_tree().get_nodes_in_group("items"):
-		it.queue_free()
-
-	floor_layer.clear()
-	for c in d.get("floor_cells", []):
-		floor_layer.set_cell(
-			Vector2i(int(c["x"]), int(c["y"])),
-			int(c["src"]),
-			Vector2i(int(c["ax"]), int(c["ay"])),
-			int(c.get("alt", 0)),
-		)
-	wall_layer.clear()
-	for c in d.get("wall_cells", []):
-		wall_layer.set_cell(
-			Vector2i(int(c["x"]), int(c["y"])),
-			int(c["src"]),
-			Vector2i(int(c["ax"]), int(c["ay"])),
-			int(c.get("alt", 0)),
-		)
-
-	stair_sprite.position = Vector2(stair_pos * TILE_SIZE)
-
-	player.floor_layer = floor_layer
-
-	var enemy_scene_path: String = config.enemy_scenes[0] if config.enemy_scenes.size() > 0 \
-		else "res://scenes/enemy/Enemy.tscn"
-	var enemy_scene = load(enemy_scene_path)
-	for ed in d.get("enemies", []):
-		var enemy = enemy_scene.instantiate()
-		add_child(enemy)
-		enemy.position = Vector2(int(ed["x"]) * TILE_SIZE, int(ed["y"]) * TILE_SIZE)
-		enemy.floor_layer = floor_layer
-		if "hp" in enemy and ed.has("hp"):
-			enemy.hp = int(ed["hp"])
-
-	var item_scene = load("res://scenes/item/Item.tscn")
-	for itd in d.get("items", []):
-		var item = item_scene.instantiate()
-		item.item_type = itd.get("type", "herb")
-		item.amount = int(itd.get("amount", 1))
-		add_child(item)
-		item.position = Vector2(int(itd["x"]) * TILE_SIZE, int(itd["y"]) * TILE_SIZE)
-
-	if map_view:
-		map_view.refresh(floor_layer, stair_pos, config.map_size,
-			"%s F%d" % [config.display_name, current_floor])
-
-	LogManager.add_log("中断していた %s 第 %d 階に戻った。" % [config.display_name, current_floor])
