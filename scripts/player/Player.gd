@@ -261,8 +261,7 @@ func attack() -> void:
 
 	if target and target.has_method("receive_attack"):
 		target.receive_attack(attack_power)
-	else:
-		LogManager.add_log("空振り。")
+	# 空振り時はログを出さない（モーションだけで十分なため）
 
 # 攻撃を受ける。回避判定 → ダメージ計算 → take_damage の順。
 # docs/system/combat.md §7。式は Combat.gd に集約。
