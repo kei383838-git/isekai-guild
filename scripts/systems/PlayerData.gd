@@ -6,8 +6,9 @@ extends Node
 # 装備：4 スロットに 1 個ずつ。装備中アイテムも inventory に残り続ける
 # （案 A、不思議のダンジョン系の慣習）。詳細は docs/system/equipment.md。
 #
-# 将来的に hp/sp/hunger/level 等もここへ移すことを想定する
+# 将来的に hp/sp/hunger 等もここへ移すことを想定する
 # （その時は Player.gd 側で読み書きするよう書き換える）。
+# level / experience は本ファイルで保持する（docs/system/leveling.md §6）。
 
 const SLOT_WEAPON := "weapon"
 const SLOT_SHIELD := "shield"
@@ -17,6 +18,13 @@ const ALL_SLOTS := [SLOT_WEAPON, SLOT_SHIELD, SLOT_ACCESSORY, SLOT_THROW]
 
 signal inventory_changed(inv: Dictionary)
 signal equipment_changed(equipment: Dictionary)
+# レベルが変わった瞬間に発火（自然な Lv up、stash/restore のいずれでも）。
+# Player はこれを購読してステータス（max_hp 等）を再計算する。
+signal level_changed(level: int, experience: int)
+# 自然な Lv up（add_experience 経由）でのみ発火。HP/SP 全回復・演出はこちらで実行。
+signal leveled_up(new_level: int, prev_level: int)
+# 経験値が増減したとき発火（レベルアップを伴う場合は leveled_up の後）。
+signal experience_changed(experience: int, exp_to_next: int)
 
 var inventory: Dictionary = {}
 
@@ -27,6 +35,18 @@ var equipment: Dictionary = {
 	SLOT_ACCESSORY: null,
 	SLOT_THROW: null,
 }
+
+# --- レベル / 経験値 / ジョブ ---
+# job は LevelTable.CUMULATIVE_EXP_BY_JOB のキーと一致させる。
+var job: String = "warrior"
+var level: int = 1
+var experience: int = 0
+
+# Lv1 リセット型ダンジョン用の一時待避領域。
+# 値が -1 のときは待避なし。stash で元レベルを退避、restore で復帰させる。
+# docs/system/loot_loss.md §6 / docs/system/leveling.md §8。
+var stashed_level: int = -1
+var stashed_experience: int = 0
 
 # --- inventory ---
 
@@ -130,3 +150,56 @@ func _auto_unequip_if_missing(key: String) -> void:
 			changed = true
 	if changed:
 		equipment_changed.emit(equipment)
+
+# --- レベル / 経験値 ---
+
+# 経験値を加算する。レベルアップが発生したら level_changed → leveled_up の順に発火、
+# 最後に experience_changed を発火する。Lv99 (MAX_LEVEL) では経験値だけ増える。
+func add_experience(amount: int) -> void:
+	if amount <= 0:
+		return
+	experience += amount
+	var new_level: int = LevelTable.level_for_exp(job, experience)
+	if new_level > level:
+		var prev: int = level
+		level = new_level
+		level_changed.emit(level, experience)
+		leveled_up.emit(level, prev)
+	experience_changed.emit(experience, LevelTable.exp_to_next(job, level, experience))
+
+# Lv1 リセット型ダンジョン入場時に呼ぶ。
+# 現在のレベル / 経験値を待避し、Lv1 / 0 EXP に置き換える。
+# 既に待避済みの場合は何もしない（多重呼びの保険）。
+func stash_and_reset_level() -> void:
+	if stashed_level >= 0:
+		return
+	stashed_level = level
+	stashed_experience = experience
+	level = 1
+	experience = 0
+	level_changed.emit(level, experience)
+	experience_changed.emit(experience, LevelTable.exp_to_next(job, level, experience))
+
+# Lv1 リセット型ダンジョン退出時に呼ぶ。
+# 待避していたレベル / 経験値を復元する。待避なしの場合は何もしない。
+func restore_stashed_level() -> void:
+	if stashed_level < 0:
+		return
+	level = stashed_level
+	experience = stashed_experience
+	stashed_level = -1
+	stashed_experience = 0
+	level_changed.emit(level, experience)
+	experience_changed.emit(experience, LevelTable.exp_to_next(job, level, experience))
+
+func has_stashed_level() -> bool:
+	return stashed_level >= 0
+
+# 新規ゲーム開始や明示的なリセット用。
+func reset_level_and_experience() -> void:
+	level = 1
+	experience = 0
+	stashed_level = -1
+	stashed_experience = 0
+	level_changed.emit(level, experience)
+	experience_changed.emit(experience, LevelTable.exp_to_next(job, level, experience))

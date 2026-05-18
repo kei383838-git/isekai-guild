@@ -11,15 +11,30 @@ extends CanvasLayer
 
 var gold_label: Label
 var quest_label: Label
+var level_label: Label
+# レベルアップ時の全画面フラッシュ。HUD.tscn は触らず動的に追加する。
+var _levelup_flash: ColorRect
 
 func _ready():
-	# 動的にゴールド・クエスト進捗ラベルを追加（HUD.tscn は触らない）
+	# 動的にゴールド・クエスト進捗・レベルラベルを追加（HUD.tscn は触らない）
 	gold_label = Label.new()
 	gold_label.name = "GoldLabel"
 	_vbox.add_child(gold_label)
 	quest_label = Label.new()
 	quest_label.name = "QuestLabel"
 	_vbox.add_child(quest_label)
+	level_label = Label.new()
+	level_label.name = "LevelLabel"
+	_vbox.add_child(level_label)
+
+	# レベルアップ用フラッシュ（最前面）
+	_levelup_flash = ColorRect.new()
+	_levelup_flash.name = "LevelUpFlash"
+	_levelup_flash.color = Color(1.0, 0.95, 0.4, 0.0)
+	_levelup_flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_levelup_flash.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_levelup_flash.z_index = 100
+	add_child(_levelup_flash)
 
 	# LogManager の信号に接続
 	LogManager.log_added.connect(_on_log_added)
@@ -28,9 +43,13 @@ func _ready():
 	QuestManager.quest_progress_changed.connect(_on_quest_progress_changed)
 	_on_gold_changed(QuestManager.gold)
 	_refresh_quest_label()
-	# PlayerData (持ち物の永続データ) の信号に接続
+	# PlayerData (持ち物 / レベルの永続データ) の信号に接続
 	PlayerData.inventory_changed.connect(_on_inventory_changed)
+	PlayerData.level_changed.connect(_on_level_changed)
+	PlayerData.experience_changed.connect(_on_experience_changed)
+	PlayerData.leveled_up.connect(_on_leveled_up)
 	_on_inventory_changed(PlayerData.inventory)
+	_on_level_changed(PlayerData.level, PlayerData.experience)
 
 	# プレイヤーを探して信号を接続（hp/sp/hunger は Player 側に残置）
 	var player = get_tree().get_first_node_in_group("player")
@@ -79,7 +98,31 @@ func _on_player_stats_changed(hp, max_hp, sp, max_sp):
 	hp_label.text = "HP: %d / %d" % [hp, max_hp]
 	hp_bar.max_value = max_hp
 	hp_bar.value = hp
-	
+
 	sp_label.text = "SP: %d / %d" % [sp, max_sp]
 	sp_bar.max_value = max_sp
 	sp_bar.value = sp
+
+func _on_level_changed(level: int, experience: int) -> void:
+	_refresh_level_label(level, experience)
+
+# 経験値だけ増えたとき（Lv up 未満）にも HUD を更新する。
+func _on_experience_changed(experience: int, _to_next: int) -> void:
+	_refresh_level_label(PlayerData.level, experience)
+
+func _refresh_level_label(level: int, experience: int) -> void:
+	if not level_label:
+		return
+	if level >= LevelTable.MAX_LEVEL:
+		level_label.text = "Lv: %d / EXP: %d (MAX)" % [level, experience]
+	else:
+		var to_next: int = LevelTable.exp_to_next(PlayerData.job, level, experience)
+		level_label.text = "Lv: %d / EXP: %d (次まで %d)" % [level, experience, to_next]
+
+# 自然なレベルアップ時のフラッシュ演出。stash/restore では呼ばれない。
+func _on_leveled_up(_new_level: int, _prev_level: int) -> void:
+	if _levelup_flash == null:
+		return
+	var tw := create_tween()
+	tw.tween_property(_levelup_flash, "color:a", 0.55, 0.08)
+	tw.tween_property(_levelup_flash, "color:a", 0.0, 0.42)

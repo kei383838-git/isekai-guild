@@ -37,6 +37,12 @@ const DIR_DOWN_RIGHT := 7
 var max_hp := 30
 var hp := 30
 var attack_power := 5
+var defense := 0
+var evasion := 0
+
+# 敵データリソース (data/enemies/<enemy_type>.tres)。
+# 起動時に enemy_type から自動ロードされ、xp / defense / evasion を反映する。
+var data: EnemyData = null
 
 @export var floor_layer: TileMapLayer
 @onready var sprite: Sprite2D = $Sprite2D
@@ -52,9 +58,27 @@ func _ready():
 	add_to_group(GROUP_NAME)
 	# 初期位置をグリッドに合わせる
 	position = position.snapped(Vector2(TILE_SIZE, TILE_SIZE))
-	
+
+	# 敵データを enemy_type から自動ロード（あれば）
+	_load_enemy_data()
+
 	# 初期向き
 	update_sprite_direction(Vector2.DOWN)
+
+# data/enemies/<enemy_type>.tres があれば読み込み、defense / evasion を反映する。
+# 未定義キーの場合は警告だけ出して既定値（0）のままにする。
+func _load_enemy_data() -> void:
+	if enemy_type == "":
+		return
+	var path: String = "res://data/enemies/%s.tres" % enemy_type
+	if not ResourceLoader.exists(path):
+		push_warning("Enemy: %s に対応する EnemyData (%s) が見つからない。" % [enemy_type, path])
+		return
+	data = load(path) as EnemyData
+	if data == null:
+		return
+	defense = data.defense
+	evasion = data.evasion
 
 # ワールド座標をグリッド座標（整数）に変換
 func get_grid_pos(pos: Vector2) -> Vector2i:
@@ -144,7 +168,10 @@ func attack_player(player, direction: Vector2):
 	update_sprite_direction(direction)
 	play_attack_motion()
 	get_tree().create_timer(0.08).timeout.connect(func():
-		player.take_damage(attack_power)
+		if player.has_method("receive_attack"):
+			player.receive_attack(attack_power)
+		else:
+			player.take_damage(attack_power)
 	, CONNECT_ONE_SHOT)
 
 # ダメージ処理を伴わない攻撃モーションだけの再生（デバッグギャラリー兼用）。
@@ -197,19 +224,29 @@ func move_towards_player(target_grid_pos: Vector2i):
 
 var is_dead := false
 
-# ダメージを受ける処理
+# 攻撃を受ける。回避判定 → ダメージ計算 → take_damage の順。
+# docs/system/combat.md §7。式は Combat.gd に集約。
+func receive_attack(attacker_atk: int) -> void:
+	if is_dead:
+		return
+	if Combat.is_evaded(evasion):
+		LogManager.add_log("敵に回避された！")
+		return
+	take_damage(Combat.compute_damage(attacker_atk, defense))
+
+# 最終ダメージを直接受ける処理（環境ダメージ等もここを通る）
 func take_damage(amount: int):
 	if is_dead: return
-	
+
 	hp -= amount
 	LogManager.add_log("敵に %d ダメージ！" % amount)
 	set_anim_frame(FRAME_HURT)
-	
+
 	# 被弾演出（一瞬赤くなる）
 	var tween = create_tween()
 	tween.tween_property(sprite, "modulate", Color.RED, 0.1)
 	tween.tween_property(sprite, "modulate", Color.WHITE, 0.1)
-	
+
 	if hp <= 0:
 		die()
 	else:
@@ -220,6 +257,11 @@ func die():
 	is_dead = true
 
 	LogManager.add_log("敵を倒した！")
+	# 経験値付与（EnemyData.xp が未設定なら 0、＝何も起きない）
+	var gained_xp: int = data.xp if data != null else 0
+	if gained_xp > 0:
+		LogManager.add_log("経験値 %d を得た。" % gained_xp)
+		PlayerData.add_experience(gained_xp)
 	# 討伐系クエストの進捗に反映
 	QuestManager.report_kill(enemy_type)
 

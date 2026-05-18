@@ -41,8 +41,11 @@ var sp: int = 50
 var max_sp: int = 100
 var hunger: int = 100
 var max_hunger: int = 100
-var attack_power: int = 8  # 戦士の暫定基本攻撃力
-# 持ち物は PlayerData (autoload) を介して読み書きする
+var attack_power: int = 8
+var defense: int = 3
+var evasion: int = 5  # 回避率 (%)
+# レベル / 経験値とジョブは PlayerData (autoload) を介して読み書きする。
+# 持ち物・装備も PlayerData。
 
 @onready var sprite: Sprite2D = $Sprite2D
 @onready var arrow_indicator = $ArrowIndicator
@@ -52,6 +55,15 @@ func _ready() -> void:
 	_register_input_actions()
 	tile_pos = Vector2i(position / TILE_SIZE)
 	position = tile_to_world(tile_pos)
+	# レベルから初期ステータスを反映する。HP は最大、SP は初期値 50。
+	# (suspend ロード時はこの後 load_state で上書きされる)
+	_apply_stats_from_level(PlayerData.level)
+	hp = max_hp
+	# sp は SP仕様 §2「ダンジョン開始時は初期値で開始する」を踏襲し
+	# 50 で保持する。村でも同様（村側で別途回復イベントを後で検討）。
+	sp = min(sp, max_sp)
+	PlayerData.level_changed.connect(_on_player_level_changed)
+	PlayerData.leveled_up.connect(_on_player_leveled_up)
 	_show_idle()
 	# ターン経過によるリソース変化（満腹度・SP）を購読
 	TurnManager.turn_cycle_completed.connect(_on_turn_cycle_completed)
@@ -185,6 +197,8 @@ func save_state() -> Dictionary:
 		"sp": sp, "max_sp": max_sp,
 		"hunger": hunger, "max_hunger": max_hunger,
 		"attack_power": attack_power,
+		"defense": defense,
+		"evasion": evasion,
 		"turns_in_dungeon": _turns_in_dungeon,
 	}
 
@@ -200,6 +214,8 @@ func load_state(d: Dictionary) -> void:
 	hunger     = int(d.get("hunger", 100))
 	max_hunger = int(d.get("max_hunger", 100))
 	attack_power = int(d.get("attack_power", 8))
+	defense    = int(d.get("defense", 3))
+	evasion    = int(d.get("evasion", 5))
 	_turns_in_dungeon = int(d.get("turns_in_dungeon", 0))
 	stats_changed.emit(hp, max_hp, sp, max_sp)
 	hunger_changed.emit(hunger, max_hunger)
@@ -243,10 +259,20 @@ func attack() -> void:
 	sprite.frame_coords = Vector2i(_step * 2, facing)
 	get_tree().create_timer(0.3).timeout.connect(_show_idle, CONNECT_ONE_SHOT)
 
-	if target and target.has_method("take_damage"):
-		target.take_damage(attack_power)
+	if target and target.has_method("receive_attack"):
+		target.receive_attack(attack_power)
 	else:
 		LogManager.add_log("空振り。")
+
+# 攻撃を受ける。回避判定 → ダメージ計算 → take_damage の順。
+# docs/system/combat.md §7。式は Combat.gd に集約。
+func receive_attack(attacker_atk: int) -> void:
+	if _is_dead:
+		return
+	if Combat.is_evaded(evasion):
+		LogManager.add_log("攻撃を回避した！")
+		return
+	take_damage(Combat.compute_damage(attacker_atk, defense))
 
 func take_damage(amount: int) -> void:
 	if _is_dead:
@@ -257,6 +283,36 @@ func take_damage(amount: int) -> void:
 		_is_dead = true
 		_play_death_effect()
 		died.emit()
+
+# --- レベル / 経験値 ---
+
+# PlayerData.level から戦闘ステータスを反映する。
+# 既存の hp / sp の現在値は触らない（呼び元で必要に応じて回復させる）。
+func _apply_stats_from_level(lv: int) -> void:
+	var stats: Dictionary = LevelTable.stats_for_level(PlayerData.job, lv)
+	max_hp = int(stats["hp_max"])
+	max_sp = int(stats["sp_max"])
+	attack_power = int(stats["attack"])
+	defense = int(stats["defense"])
+	evasion = int(stats["evasion"])
+	# 現在値が上限を超えていたらクランプ
+	hp = min(hp, max_hp)
+	sp = min(sp, max_sp)
+
+# level_changed: 自然な Lv up、stash/restore のいずれでも来る。
+# ステータスの再計算のみ行い、HP/SP の全回復は leveled_up 側で行う。
+func _on_player_level_changed(new_level: int, _exp: int) -> void:
+	_apply_stats_from_level(new_level)
+	stats_changed.emit(hp, max_hp, sp, max_sp)
+
+# leveled_up: 経験値加算で自然に Lv up したときのみ。
+# docs/system/leveling.md §4：HP / SP を max まで全回復し、ログを出す。
+func _on_player_leveled_up(new_level: int, _prev_level: int) -> void:
+	_apply_stats_from_level(new_level)
+	hp = max_hp
+	sp = max_sp
+	stats_changed.emit(hp, max_hp, sp, max_sp)
+	LogManager.add_log("レベル %d になった！" % new_level)
 
 func _play_death_effect() -> void:
 	if sprite == null:

@@ -65,6 +65,12 @@ func _ready() -> void:
 			_generate_new_floor()  # 「F%d に到達」ログはここで出る
 	else:
 		config = _resolve_config()
+		# Lv1 リセット型ダンジョンは、入場時にレベル / 経験値を待避し
+		# 中身を Lv1 に置き換える。退出時に _return_to_base 等で復元する。
+		# 既に待避済みの場合 (再入場や保険) は何もしない。
+		if config.level_reset and not PlayerData.has_stashed_level():
+			PlayerData.stash_and_reset_level()
+			LogManager.add_log("このダンジョンは Lv1 から始まる。")
 		_apply_appearance()
 		_setup_stair_visual()
 		_generate_new_floor()
@@ -287,6 +293,11 @@ func _return_to_base() -> void:
 		LogManager.add_log("「%s」を完遂し %d G を獲得した。" % [title, reward])
 		QuestManager.clear_active_quest()
 
+	# Lv1 リセット型ダンジョンを退出するときは元のレベルに戻す
+	if config.level_reset and PlayerData.has_stashed_level():
+		PlayerData.restore_stashed_level()
+		LogManager.add_log("ダンジョンを出て、元のレベルに戻った。")
+
 	LogManager.add_log("村へ帰還する。")
 	get_tree().change_scene_to_file(ret)
 
@@ -305,6 +316,10 @@ func _on_player_died() -> void:
 
 func _force_return_to_village() -> void:
 	LogManager.add_log("村へ運ばれた…")
+	# Lv1 リセット型ダンジョンで死亡しても、元のレベルに復元する。
+	# docs/world/lore.md §6「レベルは下がらない」。
+	if config.level_reset and PlayerData.has_stashed_level():
+		PlayerData.restore_stashed_level()
 	var ret: String = config.return_scene if config.return_scene != "" \
 		else "res://scenes/main/Village.tscn"
 	get_tree().change_scene_to_file(ret)

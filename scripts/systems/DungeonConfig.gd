@@ -41,3 +41,7 @@ extends Resource
 @export var difficulty: int = 1  # 1=低 / 2=中 / 3=高
 @export var allow_return: bool = true  # ESC で帰還可能か（高難易度ダンジョンは false）
 @export var return_scene: String = "res://scenes/main/Village.tscn"
+# Lv1 リセット型ダンジョン。入場時にプレイヤーの level / experience を待避し、
+# 中身を Lv1 / 0 EXP に書き換える。退出時（踏破・帰還・死亡）に復元する。
+# docs/system/loot_loss.md §6 / docs/system/leveling.md §8。
+@export var level_reset: bool = false

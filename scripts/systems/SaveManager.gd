@@ -142,6 +142,7 @@ func start_new_game(slot: int) -> void:
 	_pending_dungeon = {}
 	# autoloads を初期状態にリセット
 	PlayerData.clear_inventory()  # equipment も連動でクリアされる
+	PlayerData.reset_level_and_experience()
 	QuestManager.clear_active_quest()
 	QuestManager.gold = 0
 	QuestManager.gold_changed.emit(0)
@@ -209,6 +210,11 @@ func _snapshot_player_data() -> Dictionary:
 	return {
 		"inventory": PlayerData.inventory.duplicate(),
 		"equipment": PlayerData.equipment.duplicate(),
+		"job": PlayerData.job,
+		"level": PlayerData.level,
+		"experience": PlayerData.experience,
+		"stashed_level": PlayerData.stashed_level,
+		"stashed_experience": PlayerData.stashed_experience,
 	}
 
 func _snapshot_quest_manager() -> Dictionary:
@@ -232,8 +238,19 @@ func _restore_player_data(d: Dictionary) -> void:
 		if not eq.has(slot):
 			eq[slot] = null
 	PlayerData.equipment = eq
+	# レベル系（旧スロットには無いキーがあり得るので default を用意）
+	PlayerData.job = String(d.get("job", "warrior"))
+	PlayerData.level = int(d.get("level", 1))
+	PlayerData.experience = int(d.get("experience", 0))
+	PlayerData.stashed_level = int(d.get("stashed_level", -1))
+	PlayerData.stashed_experience = int(d.get("stashed_experience", 0))
 	PlayerData.inventory_changed.emit(PlayerData.inventory)
 	PlayerData.equipment_changed.emit(PlayerData.equipment)
+	PlayerData.level_changed.emit(PlayerData.level, PlayerData.experience)
+	PlayerData.experience_changed.emit(
+		PlayerData.experience,
+		LevelTable.exp_to_next(PlayerData.job, PlayerData.level, PlayerData.experience),
+	)
 
 func _restore_quest_manager(d: Dictionary) -> void:
 	QuestManager.gold = int(d.get("gold", 0))
