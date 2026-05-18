@@ -1,6 +1,22 @@
-[gd_scene load_steps=2 format=3 uid="uid://75fd8mliijcb"]
+[gd_scene load_steps=3 format=3 uid="uid://75fd8mliijcb"]
 
 [ext_resource type="Script" uid="uid://bmxkfhv4nidu1" path="res://scripts/ui/HUD.gd" id="1_h1u2v"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_log"]
+bg_color = Color(0, 0, 0, 0.72)
+border_width_left = 1
+border_width_top = 2
+border_width_right = 1
+border_width_bottom = 2
+border_color = Color(0.788235, 0.639216, 0.341176, 1)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+content_margin_left = 12.0
+content_margin_top = 8.0
+content_margin_right = 12.0
+content_margin_bottom = 8.0
 
 [node name="HUD" type="CanvasLayer"]
 script = ExtResource("1_h1u2v")
@@ -53,22 +69,22 @@ layout_mode = 2
 text = "Hunger: 100 / 100"
 
 [node name="LogPanel" type="Panel" parent="."]
-custom_minimum_size = Vector2(400, 100)
-anchors_preset = 2
+anchors_preset = 12
 anchor_top = 1.0
-anchor_bottom = 1.0
-offset_left = 10.0
-offset_top = -20.0
-offset_right = 410.0
-offset_bottom = 80.0
-
-[node name="LogLabel" type="RichTextLabel" parent="LogPanel"]
-layout_mode = 0
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = 5.0
-offset_top = 5.0
-offset_right = -5.0
-offset_bottom = -5.0
+offset_left = 32.0
+offset_top = -132.0
+offset_right = -32.0
+offset_bottom = -12.0
+grow_horizontal = 2
+grow_vertical = 0
+theme_override_styles/panel = SubResource("StyleBoxFlat_log")
+
+[node name="LogLabel" type="RichTextLabel" parent="LogPanel"]
+layout_mode = 1
+anchor_right = 1.0
+anchor_bottom = 1.0
 bbcode_enabled = true
 scroll_following = true
+theme_override_font_sizes/normal_font_size = 14

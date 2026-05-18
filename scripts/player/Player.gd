@@ -129,7 +129,7 @@ func move(direction: Vector2i) -> void:
 	# 満腹度 0 で移動すると 1 歩 1 HP 減（攻撃・スキル等では発生しない）
 	if not in_village and hunger == 0:
 		take_damage(1)
-		LogManager.add_log("空腹で 1 ダメージ。")
+		LogManager.add_log("空腹で [color=#ff8a6b]1[/color] ダメージ。")
 	get_tree().create_timer(0.3).timeout.connect(_show_idle, CONNECT_ONE_SHOT)
 
 # 現在 tile_pos と同じマスにあるアイテムを 1 つ拾う。
@@ -266,13 +266,17 @@ func attack() -> void:
 
 # 攻撃を受ける。回避判定 → ダメージ計算 → take_damage の順。
 # docs/system/combat.md §7。式は Combat.gd に集約。
+# 被ダメージのログはここで出す。take_damage は空腹ダメージ等の
+# 別文脈からも呼ばれるため、内部で固定文言を出さない。docs/system/hud.md 参照。
 func receive_attack(attacker_atk: int) -> void:
 	if _is_dead:
 		return
 	if Combat.is_evaded(evasion):
 		LogManager.add_log("攻撃を回避した！")
 		return
-	take_damage(Combat.compute_damage(attacker_atk, defense))
+	var dmg: int = Combat.compute_damage(attacker_atk, defense)
+	LogManager.add_log("[color=#ff8a6b]%d[/color] ダメージを受けた！" % dmg)
+	take_damage(dmg)
 
 func take_damage(amount: int) -> void:
 	if _is_dead:
@@ -312,7 +316,7 @@ func _on_player_leveled_up(new_level: int, _prev_level: int) -> void:
 	hp = max_hp
 	sp = max_sp
 	stats_changed.emit(hp, max_hp, sp, max_sp)
-	LogManager.add_log("レベル %d になった！" % new_level)
+	LogManager.add_log("[color=#ffd86b]レベル %d になった！[/color]" % new_level)
 
 func _play_death_effect() -> void:
 	if sprite == null:

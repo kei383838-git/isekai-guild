@@ -239,7 +239,7 @@ func take_damage(amount: int):
 	if is_dead: return
 
 	hp -= amount
-	LogManager.add_log("敵に %d ダメージ！" % amount)
+	LogManager.add_log("敵に [color=#ff8a6b]%d[/color] ダメージ！" % amount)
 	set_anim_frame(FRAME_HURT)
 
 	# 被弾演出（一瞬赤くなる）
@@ -260,7 +260,7 @@ func die():
 	# 経験値付与（EnemyData.xp が未設定なら 0、＝何も起きない）
 	var gained_xp: int = data.xp if data != null else 0
 	if gained_xp > 0:
-		LogManager.add_log("経験値 %d を得た。" % gained_xp)
+		LogManager.add_log("経験値 [color=#7fd3ff]%d[/color] を得た。" % gained_xp)
 		PlayerData.add_experience(gained_xp)
 	# 討伐系クエストの進捗に反映
 	QuestManager.report_kill(enemy_type)

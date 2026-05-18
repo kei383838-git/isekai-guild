@@ -76,9 +76,27 @@ func _refresh_quest_label() -> void:
 	else:
 		quest_label.text = "依頼: %s (%d / %d)" % [q.title, QuestManager.quest_progress, q.target_count]
 
+# 行数上限。超過分は先頭から削除する。docs/system/hud.md 参照。
+const LOG_MAX_LINES := 200
+
 func _on_log_added(message: String):
-	if log_label:
-		log_label.append_text(message + "\n")
+	if log_label == null:
+		return
+	log_label.append_text(message + "\n")
+	_trim_log_lines()
+
+func _trim_log_lines() -> void:
+	var excess: int = log_label.get_line_count() - LOG_MAX_LINES
+	if excess <= 0:
+		return
+	# RichTextLabel には行単位の削除 API がないので、テキスト全体を取り直して再構築する。
+	# get_parsed_text() は BBCode を取り除いた表示テキストを返すため、
+	# 配色が消えるが「200 行を超えた古いログ」のみに発生するため許容する。
+	var text: String = log_label.get_parsed_text()
+	var lines: PackedStringArray = text.split("\n")
+	var kept: PackedStringArray = lines.slice(excess)
+	log_label.clear()
+	log_label.append_text("\n".join(kept))
 
 func _on_hunger_changed(hunger: int, max_hunger: int):
 	if hunger_label:

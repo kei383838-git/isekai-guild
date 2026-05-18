@@ -290,7 +290,7 @@ func _return_to_base() -> void:
 		var reward: int = QuestManager.active_quest.reward_gold
 		var title: String = QuestManager.active_quest.title
 		QuestManager.add_gold(reward)
-		LogManager.add_log("「%s」を完遂し %d G を獲得した。" % [title, reward])
+		LogManager.add_log("「%s」を完遂し [color=#ffd86b]%d G[/color] を獲得した。" % [title, reward])
 		QuestManager.clear_active_quest()
 
 	# Lv1 リセット型ダンジョンを退出するときは元のレベルに戻す
@@ -342,7 +342,7 @@ func _apply_loot_loss() -> void:
 	var gold_lost: int = int(round(QuestManager.gold * rate))
 	if gold_lost > 0:
 		QuestManager.add_gold(-gold_lost)
-		LogManager.add_log("%d G を失った…" % gold_lost)
+		LogManager.add_log("[color=#ffd86b]%d G[/color] を失った…" % gold_lost)
 
 # 難易度（1=低／2=中／3=高）からロスト率を決める。
 # loot_loss.md：低=なし／中=30〜70%（中間値 50% を採用）／高=全ロスト。
