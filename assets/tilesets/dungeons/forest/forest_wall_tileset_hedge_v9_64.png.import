@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://cmvyssqwdss5a"
-path="res://.godot/imported/商人.png-0d2ee4262c9dce74a2a81a3998eeacf9.ctex"
+uid="uid://bk30xw28tklbv"
+path="res://.godot/imported/forest_wall_tileset_hedge_v9_64.png-ef981a26f1882e24697afcc0ce56b398.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/characters/商人.png"
-dest_files=["res://.godot/imported/商人.png-0d2ee4262c9dce74a2a81a3998eeacf9.ctex"]
+source_file="res://assets/tilesets/dungeons/forest/forest_wall_tileset_hedge_v9_64.png"
+dest_files=["res://.godot/imported/forest_wall_tileset_hedge_v9_64.png-ef981a26f1882e24697afcc0ce56b398.ctex"]
 
 [params]
 

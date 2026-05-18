@@ -29,6 +29,10 @@ const DIR_DOWN_RIGHT := 7
 # 観察モード（デバッグギャラリー用）。false にすると act() が空動作になる。
 @export var ai_enabled: bool = true
 
+# false の間は斜め移動・斜め攻撃でも左右を優先して4方向表示にする。
+# 8方向素材の品質が揃った敵は true に戻せる。
+@export var use_8_direction_sprite: bool = false
+
 # ステータス
 var max_hp := 30
 var hp := 30
@@ -80,19 +84,37 @@ func can_move(direction: Vector2) -> bool:
 	return true
 
 # 向きに合わせてスプライトの行を更新する。
-# slime_beginner_64.png は 10列 x 8行、行順は Player.gd と同じ8方向。
+# 敵スプライトは 10列 x 8行だが、既定では読みやすさ優先で4方向だけ使う。
 func update_sprite_direction(direction: Vector2):
+	facing_row = _direction_to_8_direction_row(direction) if use_8_direction_sprite \
+		else _direction_to_4_direction_row(direction)
+
+func _direction_to_4_direction_row(direction: Vector2) -> int:
+	var dx := int(sign(direction.x))
+	var dy := int(sign(direction.y))
+	if dx < 0:
+		return DIR_LEFT
+	if dx > 0:
+		return DIR_RIGHT
+	if dy < 0:
+		return DIR_UP
+	if dy > 0:
+		return DIR_DOWN
+	return facing_row
+
+func _direction_to_8_direction_row(direction: Vector2) -> int:
 	var dx := int(sign(direction.x))
 	var dy := int(sign(direction.y))
 	match Vector2i(dx, dy):
-		Vector2i(0, 1): facing_row = DIR_DOWN
-		Vector2i(-1, 1): facing_row = DIR_DOWN_LEFT
-		Vector2i(-1, 0): facing_row = DIR_LEFT
-		Vector2i(-1, -1): facing_row = DIR_UP_LEFT
-		Vector2i(0, -1): facing_row = DIR_UP
-		Vector2i(1, -1): facing_row = DIR_UP_RIGHT
-		Vector2i(1, 0): facing_row = DIR_RIGHT
-		Vector2i(1, 1): facing_row = DIR_DOWN_RIGHT
+		Vector2i(0, 1): return DIR_DOWN
+		Vector2i(-1, 1): return DIR_DOWN_LEFT
+		Vector2i(-1, 0): return DIR_LEFT
+		Vector2i(-1, -1): return DIR_UP_LEFT
+		Vector2i(0, -1): return DIR_UP
+		Vector2i(1, -1): return DIR_UP_RIGHT
+		Vector2i(1, 0): return DIR_RIGHT
+		Vector2i(1, 1): return DIR_DOWN_RIGHT
+	return facing_row
 
 func set_anim_frame(column: int) -> void:
 	if not sprite:

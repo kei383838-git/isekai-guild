@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://cccde8gsq24us"
-path="res://.godot/imported/forest.png-2c3bc26c8dbd5952e2b1676b487eae4f.ctex"
+uid="uid://bh3cipd8ar0ar"
+path="res://.godot/imported/mischievous_fairy_beginner_64.png-0e95ee831bbbdc79770beaf99cb5523d.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/map/forest.png"
-dest_files=["res://.godot/imported/forest.png-2c3bc26c8dbd5952e2b1676b487eae4f.ctex"]
+source_file="res://assets/characters/enemies/mischievous_fairy_beginner_64.png"
+dest_files=["res://.godot/imported/mischievous_fairy_beginner_64.png-0e95ee831bbbdc79770beaf99cb5523d.ctex"]
 
 [params]
 

@@ -15,6 +15,29 @@ const DEFAULT_SOURCE_WALL = 0
 const DEFAULT_SOURCE_FLOOR = 1
 const ATLAS_POS_FALLBACK = Vector2i(0, 0)
 
+const WALL_TOP_LEFT = Vector2i(0, 0)
+const WALL_TOP_A = Vector2i(1, 0)
+const WALL_TOP_B = Vector2i(2, 0)
+const WALL_TOP_RIGHT = Vector2i(3, 0)
+const WALL_LEFT_A = Vector2i(0, 1)
+const WALL_FILL_A = Vector2i(1, 1)
+const WALL_FILL_B = Vector2i(2, 1)
+const WALL_RIGHT_A = Vector2i(3, 1)
+const WALL_LEFT_B = Vector2i(0, 2)
+const WALL_FILL_C = Vector2i(1, 2)
+const WALL_FILL_D = Vector2i(2, 2)
+const WALL_RIGHT_B = Vector2i(3, 2)
+const WALL_BOTTOM_LEFT = Vector2i(0, 3)
+const WALL_BOTTOM_A = Vector2i(1, 3)
+const WALL_BOTTOM_B = Vector2i(2, 3)
+const WALL_BOTTOM_RIGHT = Vector2i(3, 3)
+const WALL_FILL_ATLAS_COORDS = [
+	WALL_FILL_A,
+	WALL_FILL_B,
+	WALL_FILL_C,
+	WALL_FILL_D,
+]
+
 var floor_layer: TileMapLayer
 var wall_layer: TileMapLayer
 var rooms_list: Array[Rect2i] = []
@@ -46,14 +69,9 @@ func generate(f_layer: TileMapLayer, w_layer: TileMapLayer, cfg: DungeonConfig =
 	floor_layer.clear()
 	wall_layer.clear()
 
-	# 1. すべて壁で埋める
-	for x in range(map_size.x):
-		for y in range(map_size.y):
-			wall_layer.set_cell(Vector2i(x, y), _src_wall, _random_wall_atlas())
-
 	var floor_cells = []
 
-	# 2. 部屋の生成 (目標数に達するまで試行)
+	# 1. 部屋の生成 (目標数に達するまで試行)
 	var target_room_count = randi_range(room_count_min, room_count_max)
 	for i in range(target_room_count * 5):
 		if rooms_list.size() >= target_room_count: break
@@ -95,6 +113,9 @@ func generate(f_layer: TileMapLayer, w_layer: TileMapLayer, cfg: DungeonConfig =
 				if another_room != random_room:
 					_create_corridor(_get_center(another_room), _get_center(new_room), floor_cells)
 			
+	# 2. 床セルとの隣接関係を見て、方向つき壁タイルを配置する。
+	_paint_walls(map_size, floor_cells)
+
 	return floor_cells
 
 func _get_center(rect: Rect2i) -> Vector2i:
@@ -116,6 +137,68 @@ func _create_corridor(start: Vector2i, end: Vector2i, floor_cells: Array):
 		floor_layer.set_cell(pos, _src_floor, _random_floor_atlas())
 		wall_layer.erase_cell(pos)
 		if not floor_cells.has(pos): floor_cells.append(pos)
+
+func _paint_walls(map_size: Vector2i, floor_cells: Array) -> void:
+	var floor_lookup := {}
+	for cell in floor_cells:
+		floor_lookup[cell] = true
+
+	for x in range(map_size.x):
+		for y in range(map_size.y):
+			var pos := Vector2i(x, y)
+			if floor_lookup.has(pos):
+				wall_layer.erase_cell(pos)
+			else:
+				wall_layer.set_cell(pos, _src_wall, _wall_atlas_for(pos, floor_lookup))
+
+func _wall_atlas_for(pos: Vector2i, floor_lookup: Dictionary) -> Vector2i:
+	var up := _is_floor_cell(floor_lookup, pos + Vector2i(0, -1))
+	var down := _is_floor_cell(floor_lookup, pos + Vector2i(0, 1))
+	var left := _is_floor_cell(floor_lookup, pos + Vector2i(-1, 0))
+	var right := _is_floor_cell(floor_lookup, pos + Vector2i(1, 0))
+
+	# 部屋や通路の斜め角を囲う壁セル。角タイルは L 字なので、直交方向に
+	# 床が隣接しているセルではなく、斜めにだけ床があるセルへ使う。
+	if not up and not down and not left and not right:
+		if _is_floor_cell(floor_lookup, pos + Vector2i(1, 1)):
+			return _wall_atlas_or_random(WALL_TOP_LEFT)
+		if _is_floor_cell(floor_lookup, pos + Vector2i(-1, 1)):
+			return _wall_atlas_or_random(WALL_TOP_RIGHT)
+		if _is_floor_cell(floor_lookup, pos + Vector2i(1, -1)):
+			return _wall_atlas_or_random(WALL_BOTTOM_LEFT)
+		if _is_floor_cell(floor_lookup, pos + Vector2i(-1, -1)):
+			return _wall_atlas_or_random(WALL_BOTTOM_RIGHT)
+
+	if down:
+		return _wall_alternate(WALL_TOP_A, WALL_TOP_B, pos)
+	if up:
+		return _wall_alternate(WALL_BOTTOM_A, WALL_BOTTOM_B, pos)
+	if right:
+		return _wall_alternate(WALL_LEFT_A, WALL_LEFT_B, pos)
+	if left:
+		return _wall_alternate(WALL_RIGHT_A, WALL_RIGHT_B, pos)
+
+	return _wall_fill_atlas(pos)
+
+func _is_floor_cell(floor_lookup: Dictionary, pos: Vector2i) -> bool:
+	return floor_lookup.has(pos)
+
+func _wall_alternate(a: Vector2i, b: Vector2i, pos: Vector2i) -> Vector2i:
+	return _wall_atlas_or_random(a if (pos.x + pos.y) % 2 == 0 else b)
+
+func _wall_fill_atlas(pos: Vector2i) -> Vector2i:
+	var available: Array[Vector2i] = []
+	for coords in WALL_FILL_ATLAS_COORDS:
+		if _wall_atlas_coords.has(coords):
+			available.append(coords)
+	if available.is_empty():
+		return _random_wall_atlas()
+	return available[abs(pos.x * 13 + pos.y * 7) % available.size()]
+
+func _wall_atlas_or_random(coords: Vector2i) -> Vector2i:
+	if _wall_atlas_coords.has(coords):
+		return coords
+	return _random_wall_atlas()
 
 # TileSet のソースに登録されている全アトラス座標を集める。
 func _collect_atlas_coords(layer: TileMapLayer, source_id: int) -> Array[Vector2i]:

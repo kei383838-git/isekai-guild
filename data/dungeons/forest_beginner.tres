@@ -2,7 +2,7 @@
 
 [ext_resource type="Script" path="res://scripts/systems/DungeonConfig.gd" id="1"]
 [ext_resource type="TileSet" path="res://assets/tilesets/dungeons/forest/forest_floor_tileset_v1.tres" id="2_floor"]
-[ext_resource type="TileSet" path="res://assets/tilesets/dungeons/forest/forest_wall_tileset_v2.tres" id="3_wall"]
+[ext_resource type="TileSet" path="res://assets/tilesets/dungeons/forest/forest_wall_tileset_hedge_v9.tres" id="3_wall"]
 
 [resource]
 script = ExtResource("1")
