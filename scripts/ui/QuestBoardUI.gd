@@ -1,11 +1,22 @@
 extends CanvasLayer
 
+# クエストボード UI。マウスとキーボード両対応。
+# - 依頼選択は VBox / HBox の自動フォーカス推論で ↑↓ ←→
+# - 決定は ui_accept (Enter / Space) → Button 標準動作
+# - 戻る/閉じる は ui_cancel (Esc) と Backspace を _unhandled_input で捕捉
+#   詳細は docs/system/quest_board.md
+
 signal board_closed
 
 @onready var list_panel    = $BoardContainer/Margin/VBox/ListPanel
 @onready var detail_panel  = $BoardContainer/Margin/VBox/DetailPanel
 @onready var accept_panel  = $BoardContainer/Margin/VBox/AcceptPanel
 @onready var quest_list    = $BoardContainer/Margin/VBox/ListPanel/QuestList
+@onready var close_button  = $BoardContainer/Margin/VBox/ListPanel/CloseButton
+@onready var accept_button: Button = $BoardContainer/Margin/VBox/DetailPanel/ButtonsHBox/AcceptButton
+@onready var back_button: Button   = $BoardContainer/Margin/VBox/DetailPanel/ButtonsHBox/BackButton
+@onready var depart_button: Button  = $BoardContainer/Margin/VBox/AcceptPanel/ButtonsHBox/DepartButton
+@onready var prepare_button: Button = $BoardContainer/Margin/VBox/AcceptPanel/ButtonsHBox/PrepareButton
 @onready var detail_title  = $BoardContainer/Margin/VBox/DetailPanel/TitleLabel
 @onready var detail_diff   = $BoardContainer/Margin/VBox/DetailPanel/DifficultyLabel
 @onready var detail_type   = $BoardContainer/Margin/VBox/DetailPanel/TypeLabel
@@ -15,16 +26,45 @@ signal board_closed
 @onready var accept_msg    = $BoardContainer/Margin/VBox/AcceptPanel/AcceptMessage
 
 var _selected: QuestData = null
+# 直前に選択していた依頼の index。Detail から List に戻った時に
+# その依頼ボタンへフォーカスを復元するために保持する。
+var _selected_index: int = 0
 
 func _ready() -> void:
-	$BoardContainer/Margin/VBox/ListPanel/CloseButton.pressed.connect(_on_close_pressed)
-	$BoardContainer/Margin/VBox/DetailPanel/ButtonsHBox/AcceptButton.pressed.connect(_on_accept_pressed)
-	$BoardContainer/Margin/VBox/DetailPanel/ButtonsHBox/BackButton.pressed.connect(_on_back_pressed)
-	$BoardContainer/Margin/VBox/AcceptPanel/ButtonsHBox/DepartButton.pressed.connect(_on_depart_pressed)
-	$BoardContainer/Margin/VBox/AcceptPanel/ButtonsHBox/PrepareButton.pressed.connect(_on_prepare_pressed)
+	close_button.pressed.connect(_on_close_pressed)
+	accept_button.pressed.connect(_on_accept_pressed)
+	back_button.pressed.connect(_on_back_pressed)
+	depart_button.pressed.connect(_on_depart_pressed)
+	prepare_button.pressed.connect(_on_prepare_pressed)
+
+# Esc / Backspace で戻る or 閉じる。
+# ui_accept (Enter/Space) と矢印は Button / VBox / HBox が自動で処理する。
+func _unhandled_input(event: InputEvent) -> void:
+	if not visible:
+		return
+	var is_back := event.is_action_pressed("ui_cancel")
+	if not is_back and event is InputEventKey:
+		if event.pressed and not event.echo and event.keycode == KEY_BACKSPACE:
+			is_back = true
+	if is_back:
+		_handle_back()
+		get_viewport().set_input_as_handled()
+
+# 現在表示中のパネルに応じて戻り先を分岐：
+# - AcceptPanel: 受注済みなので Detail には戻らず「準備をする」(村に戻る) 扱い
+# - DetailPanel: 一覧に戻る
+# - ListPanel:   閉じる
+func _handle_back() -> void:
+	if accept_panel.visible:
+		_on_prepare_pressed()
+	elif detail_panel.visible:
+		_show_list()
+	else:
+		_on_close_pressed()
 
 func open() -> void:
 	show()
+	_selected_index = 0
 	_show_list()
 
 func _show_list() -> void:
@@ -32,20 +72,38 @@ func _show_list() -> void:
 	detail_panel.hide()
 	accept_panel.hide()
 	_populate_list()
+	_focus_list_initial()
 
 func _populate_list() -> void:
+	# queue_free は遅延削除なので、add_child した新規ボタンと
+	# get_child(idx) のインデックスがずれる。即時 remove_child してから捨てる。
 	for child in quest_list.get_children():
+		quest_list.remove_child(child)
 		child.queue_free()
 	for quest in QuestManager.available_quests:
 		var btn := Button.new()
 		var stars := "★".repeat(quest.difficulty) + "☆".repeat(5 - quest.difficulty)
 		btn.text = quest.title + "    " + stars
 		btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		btn.focus_mode = Control.FOCUS_ALL
 		btn.pressed.connect(_on_quest_selected.bind(quest))
 		quest_list.add_child(btn)
 
+# ListPanel を開いた時の初期フォーカス。
+# 依頼があれば直前に選んでいたインデックス、無ければ閉じるボタンに当てる。
+func _focus_list_initial() -> void:
+	var count := quest_list.get_child_count()
+	if count > 0:
+		var idx: int = clamp(_selected_index, 0, count - 1)
+		var btn := quest_list.get_child(idx) as Button
+		if btn:
+			btn.grab_focus()
+			return
+	close_button.grab_focus()
+
 func _on_quest_selected(quest: QuestData) -> void:
 	_selected = quest
+	_selected_index = QuestManager.available_quests.find(quest)
 	detail_title.text  = quest.title
 	var stars := "★".repeat(quest.difficulty) + "☆".repeat(5 - quest.difficulty)
 	detail_diff.text   = "難易度: " + stars
@@ -56,12 +114,14 @@ func _on_quest_selected(quest: QuestData) -> void:
 	detail_desc.text   = quest.description
 	list_panel.hide()
 	detail_panel.show()
+	accept_button.grab_focus()
 
 func _on_accept_pressed() -> void:
 	QuestManager.accept_quest(_selected)
 	accept_msg.text = "「%s」を受注しました。" % _selected.title
 	detail_panel.hide()
 	accept_panel.show()
+	depart_button.grab_focus()
 
 func _on_depart_pressed() -> void:
 	hide()
