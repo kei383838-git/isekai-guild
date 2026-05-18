@@ -4,6 +4,7 @@ extends CanvasLayer
 @onready var sp_label = $MarginContainer/VBoxContainer/SPHBox/SPLabel
 @onready var hp_bar = $MarginContainer/VBoxContainer/HPHBox/HPBar
 @onready var sp_bar = $MarginContainer/VBoxContainer/SPHBox/SPBar
+@onready var log_panel: Panel = $LogPanel
 @onready var log_label = $LogPanel/LogLabel
 @onready var inventory_label = $MarginContainer/VBoxContainer/InventoryLabel
 @onready var hunger_label = $MarginContainer/VBoxContainer/HungerLabel
@@ -35,6 +36,17 @@ func _ready():
 	_levelup_flash.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_levelup_flash.z_index = 100
 	add_child(_levelup_flash)
+
+	# メッセージウィンドウのアイドル非表示タイマー
+	_log_hide_timer = Timer.new()
+	_log_hide_timer.one_shot = true
+	_log_hide_timer.wait_time = LOG_IDLE_HIDE_DELAY
+	_log_hide_timer.timeout.connect(_on_log_idle_timeout)
+	add_child(_log_hide_timer)
+	# 起動直後はログがまだ無いので非表示。最初の add_log で表示される。
+	if log_panel:
+		log_panel.modulate.a = 0.0
+		log_panel.visible = false
 
 	# LogManager の信号に接続
 	LogManager.log_added.connect(_on_log_added)
@@ -78,12 +90,38 @@ func _refresh_quest_label() -> void:
 
 # 行数上限。超過分は先頭から削除する。docs/system/hud.md 参照。
 const LOG_MAX_LINES := 200
+# しばらく新着が無ければメッセージウィンドウをフェードアウトして非表示にする。
+const LOG_IDLE_HIDE_DELAY := 5.0
+const LOG_FADE_DURATION := 0.5
+
+var _log_hide_timer: Timer
+var _log_fade_tween: Tween
 
 func _on_log_added(message: String):
 	if log_label == null:
 		return
 	log_label.append_text(message + "\n")
 	_trim_log_lines()
+	_show_log_panel()
+	if _log_hide_timer:
+		_log_hide_timer.start()
+
+func _show_log_panel() -> void:
+	if log_panel == null:
+		return
+	if _log_fade_tween and _log_fade_tween.is_valid():
+		_log_fade_tween.kill()
+	log_panel.visible = true
+	log_panel.modulate.a = 1.0
+
+func _on_log_idle_timeout() -> void:
+	if log_panel == null or not log_panel.visible:
+		return
+	if _log_fade_tween and _log_fade_tween.is_valid():
+		_log_fade_tween.kill()
+	_log_fade_tween = create_tween()
+	_log_fade_tween.tween_property(log_panel, "modulate:a", 0.0, LOG_FADE_DURATION)
+	_log_fade_tween.tween_callback(func(): log_panel.visible = false)
 
 func _trim_log_lines() -> void:
 	var excess: int = log_label.get_line_count() - LOG_MAX_LINES
