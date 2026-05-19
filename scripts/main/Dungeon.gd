@@ -82,11 +82,15 @@ func _ready() -> void:
 		player.died.connect(_on_player_died)
 
 func _register_input_actions() -> void:
+	# マップ：M / ゲームパッド Back (Select)
 	if not InputMap.has_action("toggle_map"):
 		InputMap.add_action("toggle_map")
-		var ev := InputEventKey.new()
-		ev.keycode = KEY_M
-		InputMap.action_add_event("toggle_map", ev)
+		var ev_k := InputEventKey.new()
+		ev_k.keycode = KEY_M
+		InputMap.action_add_event("toggle_map", ev_k)
+		var ev_j := InputEventJoypadButton.new()
+		ev_j.button_index = JOY_BUTTON_BACK
+		InputMap.action_add_event("toggle_map", ev_j)
 
 func _resolve_config() -> DungeonConfig:
 	# 通常はクエスト受注で active_quest.dungeon_config が入っている
@@ -231,8 +235,10 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("toggle_map"):
 		map_view.toggle()
 		return
-	# ESC で帰還（通常ダンジョンのみ）
-	if event.is_action_pressed("ui_cancel") and config.allow_return:
+	# ESC で帰還（デバッグ用、キーボードのみ）。
+	# ゲームパッド B も ui_cancel に含まれるが、B は「待機」アクション
+	# としても使うため、ここではキーボード入力に限定する。
+	if event is InputEventKey and event.is_action_pressed("ui_cancel") and config.allow_return:
 		_return_to_base()
 
 # --- 階段プロンプト（B-3） ---

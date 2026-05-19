@@ -122,11 +122,29 @@ func _ready() -> void:
 	PlayerData.inventory_changed.connect(_on_inventory_changed)
 
 func _register_input_action() -> void:
+	# メニュー：E / ゲームパッド Start
 	if not InputMap.has_action("menu_toggle"):
 		InputMap.add_action("menu_toggle")
-		var ev := InputEventKey.new()
-		ev.keycode = MENU_TOGGLE_KEY
-		InputMap.action_add_event("menu_toggle", ev)
+		var ev_k := InputEventKey.new()
+		ev_k.keycode = MENU_TOGGLE_KEY
+		InputMap.action_add_event("menu_toggle", ev_k)
+		var ev_j := InputEventJoypadButton.new()
+		ev_j.button_index = JOY_BUTTON_START
+		InputMap.action_add_event("menu_toggle", ev_j)
+	# ui_accept / ui_cancel にゲームパッドが含まれていない場合の保険。
+	# Godot 4 デフォルトでは含まれるはずだが、環境差・編集の有無で抜けることがある。
+	_ensure_action_has_joy_button("ui_accept", JOY_BUTTON_A)
+	_ensure_action_has_joy_button("ui_cancel", JOY_BUTTON_B)
+
+func _ensure_action_has_joy_button(action: String, button: int) -> void:
+	if not InputMap.has_action(action):
+		return
+	for ev in InputMap.action_get_events(action):
+		if ev is InputEventJoypadButton and ev.button_index == button:
+			return
+	var pad := InputEventJoypadButton.new()
+	pad.button_index = button
+	InputMap.action_add_event(action, pad)
 
 func _unhandled_input(event: InputEvent) -> void:
 	if _is_blocked:

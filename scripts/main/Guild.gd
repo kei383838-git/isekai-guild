@@ -8,11 +8,15 @@ const TILE_SIZE = 64
 func _ready() -> void:
 	if player:
 		player.in_village = true
+	# 調べる：Enter / ゲームパッド A
 	if not InputMap.has_action("interact"):
 		InputMap.add_action("interact")
-		var ev := InputEventKey.new()
-		ev.keycode = KEY_ENTER
-		InputMap.action_add_event("interact", ev)
+		var ev_k := InputEventKey.new()
+		ev_k.keycode = KEY_ENTER
+		InputMap.action_add_event("interact", ev_k)
+		var ev_j := InputEventJoypadButton.new()
+		ev_j.button_index = JOY_BUTTON_A
+		InputMap.action_add_event("interact", ev_j)
 	TurnManager.enemy_turn_started.connect(_on_player_action_finished)
 	quest_board_ui.board_closed.connect(_on_board_closed)
 	quest_board_ui.hide()

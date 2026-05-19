@@ -34,13 +34,16 @@ func _ready() -> void:
 	var first_btn := _slot_panels[0].get_node("Margin/VBox/ActionButton") as Button
 	first_btn.grab_focus()
 
-# 削除キー（Delete）の登録。既に有る場合は二重登録しない。
+# 削除キー：Delete / ゲームパッド Y。既に有る場合は二重登録しない。
 func _register_input_action() -> void:
 	if not InputMap.has_action("slot_delete"):
 		InputMap.add_action("slot_delete")
-		var ev := InputEventKey.new()
-		ev.keycode = KEY_DELETE
-		InputMap.action_add_event("slot_delete", ev)
+		var ev_k := InputEventKey.new()
+		ev_k.keycode = KEY_DELETE
+		InputMap.action_add_event("slot_delete", ev_k)
+		var ev_j := InputEventJoypadButton.new()
+		ev_j.button_index = JOY_BUTTON_Y
+		InputMap.action_add_event("slot_delete", ev_j)
 
 # 確認ダイアログを動的に作成して画面下端の VBox に取り付ける。
 func _build_confirm_dialog() -> void:
@@ -57,7 +60,7 @@ func _build_confirm_dialog() -> void:
 func _build_hint_label() -> void:
 	var hint := Label.new()
 	hint.name = "HintLabel"
-	hint.text = "← → : 選択   Enter : 決定   Delete : 削除"
+	hint.text = "← → / D-pad : 選択   Enter / A : 決定   Delete / Y : 削除"
 	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	hint.modulate = Color(0.8, 0.8, 0.8)
 	var vbox := $Margin/VBox

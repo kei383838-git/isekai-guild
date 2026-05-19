@@ -69,32 +69,59 @@ func _ready() -> void:
 	TurnManager.turn_cycle_completed.connect(_on_turn_cycle_completed)
 
 func _register_input_actions() -> void:
+	# 待機：TAB / ゲームパッド B
 	if not InputMap.has_action("wait"):
 		InputMap.add_action("wait")
-		var ev := InputEventKey.new()
-		ev.keycode = KEY_TAB
-		InputMap.action_add_event("wait", ev)
+		var ev_k := InputEventKey.new()
+		ev_k.keycode = KEY_TAB
+		InputMap.action_add_event("wait", ev_k)
+		var ev_j := InputEventJoypadButton.new()
+		ev_j.button_index = JOY_BUTTON_B
+		InputMap.action_add_event("wait", ev_j)
+	# ダッシュ (hold)：X / ゲームパッド RB
 	if not InputMap.has_action("dash"):
 		InputMap.add_action("dash")
-		var ev := InputEventKey.new()
-		ev.keycode = KEY_X
-		InputMap.action_add_event("dash", ev)
+		var ev_k := InputEventKey.new()
+		ev_k.keycode = KEY_X
+		InputMap.action_add_event("dash", ev_k)
+		var ev_j := InputEventJoypadButton.new()
+		ev_j.button_index = JOY_BUTTON_RIGHT_SHOULDER
+		InputMap.action_add_event("dash", ev_j)
+	# 振り向き (hold)：C / ゲームパッド LB
 	if not InputMap.has_action("turn"):
 		InputMap.add_action("turn")
-		var ev := InputEventKey.new()
-		ev.keycode = KEY_C
-		InputMap.action_add_event("turn", ev)
+		var ev_k := InputEventKey.new()
+		ev_k.keycode = KEY_C
+		InputMap.action_add_event("turn", ev_k)
+		var ev_j := InputEventJoypadButton.new()
+		ev_j.button_index = JOY_BUTTON_LEFT_SHOULDER
+		InputMap.action_add_event("turn", ev_j)
+	# 攻撃：SPACE / ゲームパッド A
 	if not InputMap.has_action("attack"):
 		InputMap.add_action("attack")
-		var ev := InputEventKey.new()
-		ev.keycode = KEY_SPACE
-		InputMap.action_add_event("attack", ev)
+		var ev_k := InputEventKey.new()
+		ev_k.keycode = KEY_SPACE
+		InputMap.action_add_event("attack", ev_k)
+		var ev_j := InputEventJoypadButton.new()
+		ev_j.button_index = JOY_BUTTON_A
+		InputMap.action_add_event("attack", ev_j)
+	# 斜め (hold)：CTRL / ゲームパッド RT
+	# Axis 値 0.5 を閾値にして「半分以上引いたら ON」扱いにする。
+	if not InputMap.has_action("diagonal"):
+		InputMap.add_action("diagonal")
+		var ev_k := InputEventKey.new()
+		ev_k.keycode = KEY_CTRL
+		InputMap.action_add_event("diagonal", ev_k)
+		var ev_m := InputEventJoypadMotion.new()
+		ev_m.axis = JOY_AXIS_TRIGGER_RIGHT
+		ev_m.axis_value = 0.5
+		InputMap.action_add_event("diagonal", ev_m)
 
 func _process(_delta: float) -> void:
 	var new_mode: Mode
 	if Input.is_action_pressed("turn"):
 		new_mode = Mode.TURN
-	elif Input.is_key_pressed(KEY_CTRL):
+	elif Input.is_action_pressed("diagonal"):
 		new_mode = Mode.DIAGONAL
 	else:
 		new_mode = Mode.NORMAL
@@ -440,7 +467,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 
 	var direction := Vector2i.ZERO
-	if Input.is_key_pressed(KEY_CTRL):
+	if Input.is_action_pressed("diagonal"):
 		direction = _get_diagonal_direction(event)
 	else:
 		direction = _get_normal_direction(event)
