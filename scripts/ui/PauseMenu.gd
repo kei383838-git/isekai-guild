@@ -22,6 +22,7 @@ const MENU_TOGGLE_KEY := KEY_E
 @onready var _btn_quest: Button     = $Panel/Margin/VBox/Body/MenuButtons/QuestButton
 @onready var _btn_save: Button      = $Panel/Margin/VBox/Body/MenuButtons/SaveButton
 @onready var _btn_settings: Button  = $Panel/Margin/VBox/Body/MenuButtons/SettingsButton
+@onready var _btn_key_config: Button = $Panel/Margin/VBox/Body/MenuButtons/KeyConfigButton
 @onready var _btn_return: Button    = $Panel/Margin/VBox/Body/MenuButtons/ReturnToTitleButton
 @onready var _btn_close: Button     = $Panel/Margin/VBox/Body/MenuButtons/CloseButton
 
@@ -32,10 +33,11 @@ const MENU_TOGGLE_KEY := KEY_E
 @onready var _dialog_cancel: Button = $ConfirmDialog/Margin/VBox/Buttons/CancelButton
 
 # 中央コンテンツ切替
-@onready var _empty_view: Label         = $Panel/Margin/VBox/Body/EmptyView
-@onready var _inventory_view: Container = $Panel/Margin/VBox/Body/InventoryView
-@onready var _quest_view: Container     = $Panel/Margin/VBox/Body/QuestView
-@onready var _settings_view: Container  = $Panel/Margin/VBox/Body/SettingsView
+@onready var _empty_view: Label             = $Panel/Margin/VBox/Body/EmptyView
+@onready var _inventory_view: Container     = $Panel/Margin/VBox/Body/InventoryView
+@onready var _quest_view: Container         = $Panel/Margin/VBox/Body/QuestView
+@onready var _settings_view: Container      = $Panel/Margin/VBox/Body/SettingsView
+@onready var _key_config_view: Container    = $Panel/Margin/VBox/Body/KeyConfigView
 
 # 設定 CheckBox
 @onready var _chk_show_help:  CheckBox = $Panel/Margin/VBox/Body/SettingsView/ShowHelpCheck
@@ -97,6 +99,7 @@ func _ready() -> void:
 	_btn_inventory.pressed.connect(_show_inventory)
 	_btn_quest.pressed.connect(_show_quest)
 	_btn_settings.pressed.connect(_show_settings)
+	_btn_key_config.pressed.connect(_show_key_config)
 	_btn_save.pressed.connect(_on_save_pressed)
 	_btn_return.pressed.connect(_on_return_to_title_pressed)
 	_btn_close.pressed.connect(close)
@@ -199,12 +202,14 @@ func _show_empty() -> void:
 	_inventory_view.hide()
 	_quest_view.hide()
 	_settings_view.hide()
+	_key_config_view.hide()
 
 func _show_inventory() -> void:
 	_empty_view.hide()
 	_inventory_view.show()
 	_quest_view.hide()
 	_settings_view.hide()
+	_key_config_view.hide()
 	_refresh_inventory()
 
 func _show_quest() -> void:
@@ -212,6 +217,7 @@ func _show_quest() -> void:
 	_inventory_view.hide()
 	_quest_view.show()
 	_settings_view.hide()
+	_key_config_view.hide()
 	_refresh_quest()
 
 func _show_settings() -> void:
@@ -219,7 +225,16 @@ func _show_settings() -> void:
 	_inventory_view.hide()
 	_quest_view.hide()
 	_settings_view.show()
+	_key_config_view.hide()
 	_refresh_settings()
+
+# キー設定（Phase 2 は読み取り専用表示。Phase 3 でリバインド UI 化予定）
+func _show_key_config() -> void:
+	_empty_view.hide()
+	_inventory_view.hide()
+	_quest_view.hide()
+	_settings_view.hide()
+	_key_config_view.show()
 
 # 設定値（SettingsManager）と CheckBox 表示を同期する。
 # toggled シグナルが連鎖発火しないよう set_pressed_no_signal を使う。
