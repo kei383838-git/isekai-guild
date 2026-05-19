@@ -491,6 +491,7 @@ func _on_dialog_ok() -> void:
 			if SaveManager.current_slot >= 1:
 				SaveManager.save_normal(SaveManager.current_slot)
 			close()
+			SaveManager.end_session()
 			get_tree().change_scene_to_file("res://scenes/ui/TitleScreen.tscn")
 
 func _on_dialog_cancel() -> void:
@@ -500,6 +501,7 @@ func _on_dialog_cancel() -> void:
 		"continue_after_save":
 			# 「タイトルに戻る」= セーブは済んでいるのでそのままタイトルへ
 			close()
+			SaveManager.end_session()
 			get_tree().change_scene_to_file("res://scenes/ui/TitleScreen.tscn")
 		"confirm_return":
 			# 「いいえ」= メニューに戻る

@@ -1,15 +1,15 @@
 extends Control
 
 # タイトル画面から遷移するセーブスロット選択画面。
-# Phase A：中断セーブのみ実装されている前提。
-# 各スロットは [空き] か [中断あり] のどちらか。
+# カード単位で 3 スロット並べ、それぞれに日付 / プレイ時間 / 経過ターン /
+# 挑戦数 / 中断場所 を表示する（無いスロットは "-"）。
 # 仕様：docs/system/save.md
 
 const SAVE_DIR_LABELS := {
 	"forest_beginner": "初心者の森",
 }
 
-@onready var _slot_cards: Array[PanelContainer] = [
+@onready var _slot_panels: Array[PanelContainer] = [
 	$Margin/VBox/SlotsRow/Slot1,
 	$Margin/VBox/SlotsRow/Slot2,
 	$Margin/VBox/SlotsRow/Slot3,
@@ -17,74 +17,103 @@ const SAVE_DIR_LABELS := {
 @onready var _back_button: Button = $Margin/VBox/BackButton
 
 func _ready() -> void:
-	for i in range(_slot_cards.size()):
+	for i in range(_slot_panels.size()):
 		var slot := i + 1
-		_setup_slot_card(slot, _slot_cards[i])
+		_setup_slot(slot, _slot_panels[i])
 	_back_button.pressed.connect(_on_back_pressed)
-	# 横並びカードの左右フォーカスを明示
-	for i in range(_slot_cards.size()):
-		var btn: Button = _action_button(_slot_cards[i])
+	# カード入れ子で Godot の自動 neighbor 判定が効かないため明示設定する
+	_setup_focus_navigation()
+	# 最初のスロットの ActionButton に初期フォーカス（矢印 / Enter 操作）
+	var first_btn := _slot_panels[0].get_node("Margin/VBox/ActionButton") as Button
+	first_btn.grab_focus()
+
+func _setup_focus_navigation() -> void:
+	var buttons: Array[Button] = []
+	for panel in _slot_panels:
+		buttons.append(panel.get_node("Margin/VBox/ActionButton") as Button)
+	# 左右：スロット間を行き来できるよう連結
+	for i in range(buttons.size()):
+		var btn := buttons[i]
 		if i > 0:
-			var left_btn: Button = _action_button(_slot_cards[i - 1])
-			btn.focus_neighbor_left = btn.get_path_to(left_btn)
-			left_btn.focus_neighbor_right = left_btn.get_path_to(btn)
-	# 最初のスロットボタンにフォーカス（矢印 / Enter で操作）
-	_action_button(_slot_cards[0]).grab_focus()
+			btn.focus_neighbor_left = btn.get_path_to(buttons[i - 1])
+		if i < buttons.size() - 1:
+			btn.focus_neighbor_right = btn.get_path_to(buttons[i + 1])
+		# 下方向：BackButton へ
+		btn.focus_neighbor_bottom = btn.get_path_to(_back_button)
+	# BackButton の上方向：真ん中のスロットに戻る
+	if buttons.size() >= 2:
+		_back_button.focus_neighbor_top = _back_button.get_path_to(buttons[1])
+	elif buttons.size() == 1:
+		_back_button.focus_neighbor_top = _back_button.get_path_to(buttons[0])
 
-func _setup_slot_card(slot: int, card: PanelContainer) -> void:
+func _setup_slot(slot: int, panel: PanelContainer) -> void:
+	var vb := panel.get_node("Margin/VBox")
+	var date_label    := vb.get_node("Info/DateLabel") as Label
+	var play_label    := vb.get_node("Info/PlayTimeLabel") as Label
+	var turn_label    := vb.get_node("Info/TurnLabel") as Label
+	var attempt_label := vb.get_node("Info/AttemptLabel") as Label
+	var loc_label     := vb.get_node("Info/LocationLabel") as Label
+	var action_btn    := vb.get_node("ActionButton") as Button
+
+	# 既存接続を切る（再描画時の保険）
+	for c in action_btn.pressed.get_connections():
+		action_btn.pressed.disconnect(c["callable"])
+
 	var info := SaveManager.slot_info(slot)
-	var info_box: VBoxContainer = card.get_node("Margin/VBox/Info")
-	var date_label: Label = info_box.get_node("DateLabel")
-	var playtime_label: Label = info_box.get_node("PlayTimeLabel")
-	var turn_label: Label = info_box.get_node("TurnLabel")
-	var attempt_label: Label = info_box.get_node("AttemptLabel")
-	var location_label: Label = info_box.get_node("LocationLabel")
-	var action_button: Button = _action_button(card)
-
-	# 既存の接続を切る（再描画時のため）
-	for c in action_button.pressed.get_connections():
-		action_button.pressed.disconnect(c["callable"])
-
-	# 将来 SaveManager 拡張時に埋める想定のプレースホルダ
-	playtime_label.text = "プレイ時間\n  -"
-	turn_label.text = "経過ターン\n  -"
-	attempt_label.text = "挑戦数\n  -"
-
 	if not info.get("exists", false):
-		date_label.text = "日付\n  -"
-		location_label.text = "中断場所\n  -"
-		action_button.text = "新規ゲーム"
-		action_button.pressed.connect(_on_new_pressed.bind(slot))
+		date_label.text    = "日付\n  -"
+		play_label.text    = "プレイ時間\n  -"
+		turn_label.text    = "経過ターン\n  -"
+		attempt_label.text = "挑戦数\n  -"
+		loc_label.text     = "中断場所\n  -"
+		action_btn.text = "新規ゲーム"
+		action_btn.pressed.connect(_on_new_pressed.bind(slot))
 		return
 
-	# ロード時は中断 → 通常 の優先で読まれるため、表示も同じ優先で出す。
-	if info.get("has_suspend", false):
-		var dungeon_id: String = info.get("suspend_dungeon_id", "")
-		var dungeon_name: String = SAVE_DIR_LABELS.get(dungeon_id, dungeon_id)
-		var floor_n: int = info.get("suspend_floor", 0)
-		var saved_at: String = info.get("suspend_saved_at", "")
-		var location_text := "中断場所\n  %s F%d" % [dungeon_name, floor_n]
-		if info.get("has_normal", false):
-			location_text += "  (通常もあり)"
-		date_label.text = "日付\n  %s" % saved_at
-		location_label.text = location_text
-		action_button.text = "続きから"
-		action_button.pressed.connect(_on_load_pressed.bind(slot))
-	elif info.get("has_normal", false):
-		var saved_at: String = info.get("normal_saved_at", "")
-		date_label.text = "日付\n  %s" % saved_at
-		location_label.text = "中断場所\n  村"
-		action_button.text = "続きから"
-		action_button.pressed.connect(_on_load_pressed.bind(slot))
-	else:
-		# 念のためのフォールバック
-		date_label.text = "日付\n  -"
-		location_label.text = "中断場所\n  -"
-		action_button.text = "新規ゲーム"
-		action_button.pressed.connect(_on_new_pressed.bind(slot))
+	# 中断優先で表示（ロードも同じ優先順）
+	var prefix := "suspend" if info.get("has_suspend", false) else "normal"
+	var saved_at: String = info.get("%s_saved_at" % prefix, "")
+	var play_sec: int    = int(info.get("%s_play_time" % prefix, 0))
+	var turns: int       = int(info.get("%s_turn_count" % prefix, 0))
+	var attempts: int    = int(info.get("%s_attempt_count" % prefix, 0))
 
-func _action_button(card: PanelContainer) -> Button:
-	return card.get_node("Margin/VBox/ActionButton")
+	date_label.text    = "日付\n  %s" % _format_date(saved_at)
+	play_label.text    = "プレイ時間\n  %s" % _format_play_time(play_sec)
+	turn_label.text    = "経過ターン\n  %d" % turns
+	attempt_label.text = "挑戦数\n  %d" % attempts
+	loc_label.text     = "中断場所\n  %s" % _format_location(info)
+	action_btn.text = "続きから"
+	action_btn.pressed.connect(_on_load_pressed.bind(slot))
+
+func _format_date(s: String) -> String:
+	# Time.get_datetime_string_from_system は "2026-05-15T18:30:00" 形式
+	if s == "":
+		return "-"
+	if s.length() >= 16:
+		return s.substr(0, 10) + " " + s.substr(11, 5)
+	return s
+
+func _format_play_time(sec: int) -> String:
+	if sec <= 0:
+		return "0分"
+	var h: int = sec / 3600
+	var m: int = (sec % 3600) / 60
+	var s: int = sec % 60
+	if h > 0:
+		return "%d時間%02d分" % [h, m]
+	if m > 0:
+		return "%d分%02d秒" % [m, s]
+	return "%d秒" % s
+
+func _format_location(info: Dictionary) -> String:
+	if info.get("has_suspend", false):
+		var did: String = info.get("suspend_dungeon_id", "")
+		var dname: String = SAVE_DIR_LABELS.get(did, did)
+		var floor_n: int = int(info.get("suspend_floor", 0))
+		return "%s F%d" % [dname, floor_n]
+	if info.get("has_normal", false):
+		return "村"
+	return "-"
 
 func _on_new_pressed(slot: int) -> void:
 	SaveManager.start_new_game(slot)

@@ -22,8 +22,44 @@ var current_slot: int = -1
 var _pending_player: Dictionary = {}
 var _pending_dungeon: Dictionary = {}
 
+# ゲームセッションのメトリクス（SlotSelect 表示用）。
+# セーブ時に一緒に書き出され、ロード時に復元、start_new_game で 0 にリセット。
+# end_session (タイトル戻り時) でもライブ値を 0 に戻す。
+var play_time: float = 0.0    # 秒
+var turn_count: int = 0
+var attempt_count: int = 0
+
 func _ready() -> void:
 	_ensure_save_dir()
+	TurnManager.turn_cycle_completed.connect(_on_turn_cycle_completed)
+
+func _process(delta: float) -> void:
+	# スロット未選択時（タイトル / SlotSelect）は計測しない。
+	# ポーズ中は process_mode=PAUSABLE で _process が呼ばれないので OK。
+	if current_slot < 1:
+		return
+	play_time += delta
+
+func _on_turn_cycle_completed() -> void:
+	if current_slot < 1:
+		return
+	turn_count += 1
+
+# ダンジョン進入時 (Dungeon._ready の非 resume 経路) から呼ばれる。
+func increment_attempt_count() -> void:
+	if current_slot < 1:
+		return
+	attempt_count += 1
+
+# タイトル画面に戻る時にライブ値をリセットする。
+# セーブファイルは書き込み済みなので影響なし。
+func end_session() -> void:
+	current_slot = -1
+	play_time = 0.0
+	turn_count = 0
+	attempt_count = 0
+	_pending_player.clear()
+	_pending_dungeon.clear()
 
 func _ensure_save_dir() -> void:
 	if not DirAccess.dir_exists_absolute(SAVE_DIR):
@@ -53,6 +89,9 @@ func save_suspend(slot: int) -> bool:
 	data["version"] = SAVE_VERSION
 	data["suspend"] = {
 		"saved_at": Time.get_datetime_string_from_system(),
+		"play_time": int(play_time),
+		"turn_count": turn_count,
+		"attempt_count": attempt_count,
 		"scene": "res://scenes/main/Dungeon.tscn",
 		"player_data": _snapshot_player_data(),
 		"quest_manager": _snapshot_quest_manager(),
@@ -83,6 +122,9 @@ func save_normal(slot: int) -> bool:
 	data["version"] = SAVE_VERSION
 	data["normal"] = {
 		"saved_at": Time.get_datetime_string_from_system(),
+		"play_time": int(play_time),
+		"turn_count": turn_count,
+		"attempt_count": attempt_count,
 		"scene": scene_path,
 		"player_data": _snapshot_player_data(),
 		"quest_manager": _snapshot_quest_manager(),
@@ -123,6 +165,11 @@ func load_slot(slot: int) -> bool:
 	_pending_player = src_data.get("player", {})
 	_pending_dungeon = src_data.get("dungeon", {})
 
+	# セッションメトリクスも復元
+	play_time = float(src_data.get("play_time", 0))
+	turn_count = int(src_data.get("turn_count", 0))
+	attempt_count = int(src_data.get("attempt_count", 0))
+
 	current_slot = slot
 
 	# 中断ロード成立時のみ削除（通常は残す）
@@ -138,6 +185,9 @@ func start_new_game(slot: int) -> void:
 	if slot < 1 or slot > SLOT_COUNT:
 		return
 	current_slot = slot
+	play_time = 0.0
+	turn_count = 0
+	attempt_count = 0
 	_pending_player = {}
 	_pending_dungeon = {}
 	# autoloads を初期状態にリセット
@@ -170,10 +220,16 @@ func slot_info(slot: int) -> Dictionary:
 	var info := {"exists": true, "has_normal": false, "has_suspend": false}
 	if data.has("normal") and data["normal"] != null:
 		info["has_normal"] = true
-		info["normal_saved_at"] = data["normal"].get("saved_at", "")
+		info["normal_saved_at"]     = data["normal"].get("saved_at", "")
+		info["normal_play_time"]    = int(data["normal"].get("play_time", 0))
+		info["normal_turn_count"]   = int(data["normal"].get("turn_count", 0))
+		info["normal_attempt_count"] = int(data["normal"].get("attempt_count", 0))
 	if data.has("suspend") and data["suspend"] != null:
 		info["has_suspend"] = true
-		info["suspend_saved_at"] = data["suspend"].get("saved_at", "")
+		info["suspend_saved_at"]     = data["suspend"].get("saved_at", "")
+		info["suspend_play_time"]    = int(data["suspend"].get("play_time", 0))
+		info["suspend_turn_count"]   = int(data["suspend"].get("turn_count", 0))
+		info["suspend_attempt_count"] = int(data["suspend"].get("attempt_count", 0))
 		var dungeon = data["suspend"].get("dungeon", {})
 		info["suspend_dungeon_id"] = dungeon.get("config_id", "")
 		info["suspend_floor"] = int(dungeon.get("current_floor", 0))

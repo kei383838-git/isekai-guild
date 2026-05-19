@@ -74,6 +74,8 @@ func _ready() -> void:
 		_apply_appearance()
 		_setup_stair_visual()
 		_generate_new_floor()
+		# 新規進入として挑戦数 +1（resume 経路ではカウントしない）
+		SaveManager.increment_attempt_count()
 
 	TurnManager.enemy_turn_started.connect(_on_player_action_finished)
 	if player.has_signal("died"):
@@ -275,6 +277,8 @@ func _on_stair_suspend() -> void:
 		return
 	LogManager.add_log("中断した。")
 	_close_stair_prompt()
+	# タイトル戻り：ライブ値のメトリクスをリセット（ファイルは書き込み済み）
+	SaveManager.end_session()
 	get_tree().change_scene_to_file("res://scenes/ui/TitleScreen.tscn")
 
 func _on_stair_cancel() -> void:
