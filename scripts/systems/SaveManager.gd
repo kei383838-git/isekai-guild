@@ -209,6 +209,27 @@ func consume_pending_dungeon() -> Dictionary:
 	_pending_dungeon = {}
 	return d
 
+# --- 削除 ---
+
+# スロットファイルを物理削除する。SlotSelect から呼ぶ前提。
+# 成功時 true。ファイル無 / スロット番号不正 / 削除失敗で false。
+func delete_slot(slot: int) -> bool:
+	if slot < 1 or slot > SLOT_COUNT:
+		push_warning("SaveManager.delete_slot: 不正なスロット %d" % slot)
+		return false
+	var path := slot_path(slot)
+	if not FileAccess.file_exists(path):
+		return false
+	var err := DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
+	if err != OK:
+		push_warning("SaveManager.delete_slot: スロット %d 削除失敗 (err=%d)" % [slot, err])
+		return false
+	# 万が一 current_slot がこのスロットを指していれば end_session で巻き戻す
+	# （SlotSelect 経由で削除する想定なので通常起こらない）
+	if current_slot == slot:
+		end_session()
+	return true
+
 # --- スロット情報 ---
 
 # SlotSelect 画面で表示する情報を返す。
