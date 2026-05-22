@@ -51,15 +51,28 @@
 ### 6.1 実効値の式
 
 ```
-実効攻撃  = base_attack  + Σ(装備.stats.attack)
-実効防御  = base_defense + Σ(装備.stats.defense)
-実効回避  = base_evasion + Σ(装備.stats.evasion)
+実効攻撃  = base_attack  + Σ(装備.stats.attack  + 強化値 if stats.attack 存在)
+実効防御  = base_defense + Σ(装備.stats.defense + 強化値 if stats.defense 存在)
+実効回避  = base_evasion + Σ(装備.stats.evasion + 強化値 if stats.evasion 存在)
 ```
 
 `base_*` はレベルから算出されるベース値（[leveling.md](leveling.md) §4）。
 装備補正の合算は `PlayerData.equipment_bonus(stat_name)` が担当する。
 
 ダメージ計算式は [combat.md](combat.md) §7.1 を参照（風来のシレン式の割合軽減）。
+
+### 6.1.1 強化値（+N）
+
+各装備スロットには強化値 `enhancements[slot]` が紐づく（`PlayerData.gd`）。
+
+- 「主 stat」= 装備の `stats` の最初のキー（武器=attack, 盾=defense, 等）
+- 強化値は主 stat に対してそのまま加算される（例：+5 の木の剣 → 攻撃寄与 +8）
+- 主 stat が無い装備（お守りなど）は強化対象外
+- **Phase 3.5 仮仕様**：強化値は装備スロットに紐づくため、外すと 0 にリセットされる
+- 強化値の操作はデバッグメニュー（F11）から行う。詳細は [debug.md](debug.md) §3.2
+
+Phase 4 で inventory が個別アイテム管理に変わり、強化素材 / 成功判定 / 強化メニューが
+正規実装される。それまでデバッグ操作以外で強化値は変動しない。
 
 ### 6.2 装備品の補正値（Phase 3 時点）
 
