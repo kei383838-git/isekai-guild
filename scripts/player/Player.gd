@@ -41,11 +41,23 @@ var sp: int = 50
 var max_sp: int = 100
 var hunger: int = 100
 var max_hunger: int = 100
-var attack_power: int = 8
-var defense: int = 3
-var evasion: int = 5  # 回避率 (%)
+# 戦闘ステータスはレベルから決まる「ベース値」を保持し、
+# 装備補正を加えた「実効値」は effective_*() で取得する。
+# docs/system/equipment.md §6.1。
+var base_attack_power: int = 8
+var base_defense: int = 3
+var base_evasion: int = 5  # 回避率 (%)
 # レベル / 経験値とジョブは PlayerData (autoload) を介して読み書きする。
 # 持ち物・装備も PlayerData。
+
+func effective_attack() -> int:
+	return base_attack_power + PlayerData.equipment_bonus("attack")
+
+func effective_defense() -> int:
+	return base_defense + PlayerData.equipment_bonus("defense")
+
+func effective_evasion() -> int:
+	return base_evasion + PlayerData.equipment_bonus("evasion")
 
 @onready var sprite: Sprite2D = $Sprite2D
 @onready var arrow_indicator = $ArrowIndicator
@@ -64,6 +76,8 @@ func _ready() -> void:
 	sp = min(sp, max_sp)
 	PlayerData.level_changed.connect(_on_player_level_changed)
 	PlayerData.leveled_up.connect(_on_player_leveled_up)
+	# 装備の付け外しで実効ステータスが変わるので HUD 等に通知する
+	PlayerData.equipment_changed.connect(_on_equipment_changed)
 	_show_idle()
 	# ターン経過によるリソース変化（満腹度・SP）を購読
 	TurnManager.turn_cycle_completed.connect(_on_turn_cycle_completed)
@@ -223,9 +237,9 @@ func save_state() -> Dictionary:
 		"hp": hp, "max_hp": max_hp,
 		"sp": sp, "max_sp": max_sp,
 		"hunger": hunger, "max_hunger": max_hunger,
-		"attack_power": attack_power,
-		"defense": defense,
-		"evasion": evasion,
+		"base_attack_power": base_attack_power,
+		"base_defense": base_defense,
+		"base_evasion": base_evasion,
 		"turns_in_dungeon": _turns_in_dungeon,
 	}
 
@@ -240,9 +254,10 @@ func load_state(d: Dictionary) -> void:
 	max_sp     = int(d.get("max_sp", 100))
 	hunger     = int(d.get("hunger", 100))
 	max_hunger = int(d.get("max_hunger", 100))
-	attack_power = int(d.get("attack_power", 8))
-	defense    = int(d.get("defense", 3))
-	evasion    = int(d.get("evasion", 5))
+	# base_* キーを優先しつつ、旧キー (attack_power/defense/evasion) もフォールバックで読む
+	base_attack_power = int(d.get("base_attack_power", d.get("attack_power", 8)))
+	base_defense      = int(d.get("base_defense",      d.get("defense", 3)))
+	base_evasion      = int(d.get("base_evasion",      d.get("evasion", 5)))
 	_turns_in_dungeon = int(d.get("turns_in_dungeon", 0))
 	stats_changed.emit(hp, max_hp, sp, max_sp)
 	hunger_changed.emit(hunger, max_hunger)
@@ -287,7 +302,7 @@ func attack() -> void:
 	get_tree().create_timer(0.3).timeout.connect(_show_idle, CONNECT_ONE_SHOT)
 
 	if target and target.has_method("receive_attack"):
-		target.receive_attack(attack_power)
+		target.receive_attack(effective_attack())
 	# 空振り時はログを出さない（モーションだけで十分なため）
 
 # 攻撃を受ける。回避判定 → ダメージ計算 → take_damage の順。
@@ -297,10 +312,10 @@ func attack() -> void:
 func receive_attack(attacker_atk: int) -> void:
 	if _is_dead:
 		return
-	if Combat.is_evaded(evasion):
+	if Combat.is_evaded(effective_evasion()):
 		LogManager.add_log("攻撃を回避した！")
 		return
-	var dmg: int = Combat.compute_damage(attacker_atk, defense)
+	var dmg: int = Combat.compute_damage(attacker_atk, effective_defense())
 	LogManager.add_log("[color=#ff8a6b]%d[/color] ダメージを受けた！" % dmg)
 	take_damage(dmg)
 
@@ -322,9 +337,9 @@ func _apply_stats_from_level(lv: int) -> void:
 	var stats: Dictionary = LevelTable.stats_for_level(PlayerData.job, lv)
 	max_hp = int(stats["hp_max"])
 	max_sp = int(stats["sp_max"])
-	attack_power = int(stats["attack"])
-	defense = int(stats["defense"])
-	evasion = int(stats["evasion"])
+	base_attack_power = int(stats["attack"])
+	base_defense = int(stats["defense"])
+	base_evasion = int(stats["evasion"])
 	# 現在値が上限を超えていたらクランプ
 	hp = min(hp, max_hp)
 	sp = min(sp, max_sp)
@@ -333,6 +348,12 @@ func _apply_stats_from_level(lv: int) -> void:
 # ステータスの再計算のみ行い、HP/SP の全回復は leveled_up 側で行う。
 func _on_player_level_changed(new_level: int, _exp: int) -> void:
 	_apply_stats_from_level(new_level)
+	stats_changed.emit(hp, max_hp, sp, max_sp)
+
+# 装備の付け外しで実効ステータスが変わったとき、HUD / フッターを再描画させる。
+# 実数値 (hp/sp/max_hp/max_sp) は変わらないが stats_changed を再発火することで
+# HUD 側に「再描画してくれ」と通知する。HUD は effective_*() を読み直す。
+func _on_equipment_changed(_eq: Dictionary) -> void:
 	stats_changed.emit(hp, max_hp, sp, max_sp)
 
 # leveled_up: 経験値加算で自然に Lv up したときのみ。

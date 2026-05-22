@@ -141,6 +141,18 @@ func equipped_in(slot: String) -> String:
 		return ""
 	return v
 
+# 装備中の全スロットの stats を合算した値を返す。装備なしのスロットは無視。
+# stat_name は "attack" / "defense" / "evasion" / "throw_power" など、
+# Item.DEFS.stats のキーと一致させる。docs/system/equipment.md §6.1 参照。
+func equipment_bonus(stat_name: String) -> int:
+	var total: int = 0
+	for slot in ALL_SLOTS:
+		var key = equipment[slot]
+		if key == null:
+			continue
+		total += Item.stat_for(key, stat_name)
+	return total
+
 # 在庫から消えたキーが装備されていた場合、自動で外す（内部利用）
 func _auto_unequip_if_missing(key: String) -> void:
 	var changed := false

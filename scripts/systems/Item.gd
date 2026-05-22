@@ -10,6 +10,9 @@ enum Kind { FOOD, WEAPON, SHIELD, ACCESSORY, THROW, MISC }
 # kind  : 種別（Kind enum）
 # amount: 食料の場合の満腹度回復量。それ以外では未使用
 # desc  : 詳細パネルに出す説明文
+# stats : 装備時のステータス補正。装備可能 kind のみ意味を持つ。
+#         キー = ステータス名 ("attack" / "defense" / "evasion" / "throw_power")
+#         未定義キーは 0 として扱う。docs/system/equipment.md §6 参照。
 const DEFS := {
 	"herb": {
 		"label": "薬草",
@@ -21,21 +24,44 @@ const DEFS := {
 		"label": "木の剣",
 		"kind": Kind.WEAPON,
 		"desc": "握りやすい簡素な木の剣。",
+		"stats": {"attack": 3},
 	},
 	"wooden_shield": {
 		"label": "木の盾",
 		"kind": Kind.SHIELD,
 		"desc": "薄い木でできた軽量な盾。",
+		"stats": {"defense": 2},
 	},
 	"talisman": {
 		"label": "お守り",
 		"kind": Kind.ACCESSORY,
 		"desc": "何か起こりそうな気がする御守り。",
+		# 補正値なし。効果は Phase 4 でロスト 1 回防止を実装予定
+		"stats": {},
 	},
 	"throw_stone": {
 		"label": "投石",
 		"kind": Kind.THROW,
 		"desc": "投げて使う小石。",
+		"stats": {"throw_power": 4},
+	},
+	"power_ring": {
+		"label": "力の指輪",
+		"kind": Kind.ACCESSORY,
+		"desc": "握り締めると力が湧いてくる指輪。",
+		"stats": {"attack": 2},
+	},
+	"guard_ring": {
+		"label": "守りの指輪",
+		"kind": Kind.ACCESSORY,
+		"desc": "身を守る加護が宿った指輪。",
+		"stats": {"defense": 2},
+	},
+	"swift_ring": {
+		"label": "素早さの指輪",
+		"kind": Kind.ACCESSORY,
+		"desc": "身のこなしを軽くしてくれる指輪。",
+		"stats": {"evasion": 5},
 	},
 	"gold": {
 		"label": "ゴールド",
@@ -87,6 +113,17 @@ static func food_amount_for(item_type_key: String) -> int:
 	if def == null or def.kind != Kind.FOOD:
 		return 0
 	return def.get("amount", 0)
+
+# 装備時のステータス補正辞書。未登録 / stats 未定義は空辞書を返す。
+static func stats_for(item_type_key: String) -> Dictionary:
+	var def = DEFS.get(item_type_key, null)
+	if def == null:
+		return {}
+	return def.get("stats", {})
+
+# 個別の補正値。未登録 / stats なし / キー未定義はすべて 0。
+static func stat_for(item_type_key: String, stat_name: String) -> int:
+	return int(stats_for(item_type_key).get(stat_name, 0))
 
 func _ready():
 	add_to_group("items")

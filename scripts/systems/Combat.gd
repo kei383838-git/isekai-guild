@@ -15,6 +15,12 @@ func is_evaded(defender_eva: int) -> bool:
 		return false
 	return (randi() % 100) < defender_eva
 
-# 命中時のダメージ。最低 1 を保証する。
+# 命中時のダメージ。風来のシレン式の割合軽減を採用する。
+# docs/system/combat.md §7.1 の式に対応：
+#   damage = max(1, round(atk × (35/36)^def × 乱数(7/8〜9/8)))
+# defense 1 ごとに約 2.78% 軽減（指数減衰）。乱数で 0.875〜1.125 の揺らぎ。
+# attacker_atk / defender_def は呼び元で装備補正を加えた実効値を渡す前提。
 func compute_damage(attacker_atk: int, defender_def: int) -> int:
-	return max(1, attacker_atk - defender_def)
+	var base: float = float(attacker_atk) * pow(35.0 / 36.0, float(defender_def))
+	var rng_mul: float = randf_range(7.0 / 8.0, 9.0 / 8.0)
+	return max(1, int(round(base * rng_mul)))
