@@ -44,6 +44,15 @@ const MENU_TOGGLE_KEY := KEY_E
 @onready var _chk_fullscreen: CheckBox = $Panel/Margin/VBox/Body/SettingsView/FullscreenCheck
 @onready var _chk_auto_save:  CheckBox = $Panel/Margin/VBox/Body/SettingsView/AutoSaveCheck
 
+# キー設定（動的生成）
+@onready var _key_config_grid: GridContainer = $Panel/Margin/VBox/Body/KeyConfigView/ScrollContainer/Grid
+@onready var _key_config_reset: Button       = $Panel/Margin/VBox/Body/KeyConfigView/Footer/ResetButton
+
+# リバインドキャプチャ用オーバーレイ
+@onready var _capture_overlay: Panel = $CaptureOverlay
+@onready var _capture_message: Label = $CaptureOverlay/Margin/VBox/MessageLabel
+@onready var _capture_hint: Label    = $CaptureOverlay/Margin/VBox/HintLabel
+
 # 持ち物（左カラム）
 @onready var _equip_summary: Label     = $Panel/Margin/VBox/Body/InventoryView/LeftCol/EquipSummary
 @onready var _item_list: VBoxContainer = $Panel/Margin/VBox/Body/InventoryView/LeftCol/ListScroll/ItemList
@@ -92,6 +101,23 @@ var _dialog_mode: String = ""
 # Dungeon.gd 等から set_blocked(true/false) で制御する。
 var _is_blocked: bool = false
 
+# キーリバインド中のキャプチャ状態。""=非キャプチャ、"kb"/"pad"=キャプチャ中
+var _capture_action: String = ""
+var _capture_type: String = ""
+
+# キャプチャ中に薄表示したセル（Control と元の modulate のペア）。
+# _end_capture で復元する。
+var _dimmed_cells: Array = []
+
+# 現在の入力デバイス（"kb" or "pad" or ""=未検出）。
+# KeyConfigView 表示中、最後に押された入力種別から自動判定し、
+# 逆側の列を disabled + 薄表示にする（誤操作防止）。
+var _active_device: String = ""
+
+# デバイス lockout 中に disabled / dim にしたセル一覧。
+# 各 entry: { "cell": Control, "modulate": Color, "disabled"?: bool }
+var _locked_cells: Array = []
+
 func _ready() -> void:
 	_register_input_action()
 	hide()
@@ -110,6 +136,9 @@ func _ready() -> void:
 	_chk_show_help.toggled.connect(_on_show_help_toggled)
 	_chk_fullscreen.toggled.connect(_on_fullscreen_toggled)
 	_chk_auto_save.toggled.connect(_on_auto_save_toggled)
+	# キー設定：リバインド完了時の再描画と「デフォルトに戻す」
+	SettingsManager.binding_changed.connect(_on_binding_changed)
+	_key_config_reset.pressed.connect(_on_reset_bindings_pressed)
 	# セーブ / タイトルに戻る の enable は open() 時に
 	# in_village + current_slot で動的判定する
 
@@ -146,7 +175,7 @@ func _ensure_action_has_joy_button(action: String, button: int) -> void:
 		if ev is InputEventJoypadButton and ev.button_index == button:
 			return
 	var pad := InputEventJoypadButton.new()
-	pad.button_index = button
+	pad.button_index = button as JoyButton
 	InputMap.action_add_event(action, pad)
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -155,6 +184,106 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("menu_toggle"):
 		toggle()
 		get_viewport().set_input_as_handled()
+
+# _input：
+# - キャプチャ中：入力を奪ってリバインドに使う
+# - 非キャプチャ + メニュー表示中：入力デバイス種別を検出して
+#   KeyConfigView の lockout を更新
+func _input(event: InputEvent) -> void:
+	if _capture_action != "":
+		_handle_capture_input(event)
+		return
+	if not visible:
+		return
+	# デバイス検出（KeyConfigView 以外でも検出はしておく：切替が早い）
+	var k := _detect_device_kind(event)
+	if k != "" and k != _active_device:
+		_active_device = k
+		if _key_config_view.visible:
+			_apply_device_lockout()
+
+func _handle_capture_input(event: InputEvent) -> void:
+	# Esc は常にキャンセル（キーボードでも、キャプチャ種別に関わらず）
+	if event is InputEventKey and event.pressed and not event.echo:
+		if event.keycode == KEY_ESCAPE:
+			_end_capture()
+			get_viewport().set_input_as_handled()
+			return
+		if _capture_type == "kb":
+			SettingsManager.set_keyboard_binding(_capture_action, event.keycode)
+			_end_capture()
+			get_viewport().set_input_as_handled()
+			return
+	elif event is InputEventJoypadButton and event.pressed:
+		if _capture_type == "pad":
+			SettingsManager.set_gamepad_button_binding(_capture_action, event.button_index)
+			_end_capture()
+			get_viewport().set_input_as_handled()
+			return
+	elif event is InputEventJoypadMotion:
+		# パッドキャプチャ中のみ。スティック軸は感度が高すぎて誤認しやすいので、
+		# 明示的に LT (JOY_AXIS_TRIGGER_LEFT) / RT (JOY_AXIS_TRIGGER_RIGHT) だけ受け付ける。
+		if _capture_type == "pad":
+			if event.axis == JOY_AXIS_TRIGGER_LEFT or event.axis == JOY_AXIS_TRIGGER_RIGHT:
+				if event.axis_value > 0.5:
+					SettingsManager.set_gamepad_axis_binding(_capture_action, event.axis, 0.5)
+					_end_capture()
+					get_viewport().set_input_as_handled()
+					return
+	# キャプチャ中はその他の入力も消費して UI 副作用を防ぐ
+	get_viewport().set_input_as_handled()
+
+# 入力イベントからデバイス種別を判定。
+# スティック軸はノイズで誤検出しやすいので閾値 > 0.5 を要求する。
+func _detect_device_kind(event: InputEvent) -> String:
+	if event is InputEventKey and event.pressed and not event.echo:
+		return "kb"
+	if event is InputEventJoypadButton and event.pressed:
+		return "pad"
+	if event is InputEventJoypadMotion and absf(event.axis_value) > 0.5:
+		return "pad"
+	return ""
+
+# active_device が "kb" なら パッド列、"pad" なら キー列 を disabled + dim する。
+# 元のフォーカスがロックされる列にあった場合、有効側の先頭ボタンへ移す。
+func _apply_device_lockout() -> void:
+	_restore_locked_cells()
+	if _active_device == "":
+		return
+	var lock_col := 2 if _active_device == "kb" else 1
+	var dim_color := Color(0.5, 0.5, 0.5, 0.5)
+	var children := _key_config_grid.get_children()
+	var focus_owner = get_viewport().gui_get_focus_owner()
+	var lost_focus := false
+	var first_active_btn: Button = null
+	# ヘッダ (先頭 3 セル) はスキップ
+	for i in range(3, children.size()):
+		var cell: Control = children[i]
+		if i % 3 == lock_col:
+			var entry := {"cell": cell, "modulate": cell.modulate}
+			cell.modulate = dim_color
+			if cell is Button:
+				entry["disabled"] = (cell as Button).disabled
+				(cell as Button).disabled = true
+				if focus_owner == cell:
+					lost_focus = true
+			_locked_cells.append(entry)
+		else:
+			if cell is Button and first_active_btn == null:
+				first_active_btn = cell as Button
+	# ロックでフォーカスを失った場合、有効側の先頭ボタンへ移す
+	if lost_focus and first_active_btn != null:
+		first_active_btn.grab_focus()
+
+func _restore_locked_cells() -> void:
+	for entry in _locked_cells:
+		var cell: Control = entry["cell"]
+		if not is_instance_valid(cell):
+			continue
+		cell.modulate = entry["modulate"]
+		if entry.has("disabled"):
+			(cell as Button).disabled = bool(entry["disabled"])
+	_locked_cells.clear()
 
 # 階段プロンプト等から呼ばれる：true の間はメニューを開けない（既に開いていれば閉じる）。
 func set_blocked(b: bool) -> void:
@@ -190,10 +319,12 @@ func open() -> void:
 	_btn_inventory.grab_focus()
 
 func close() -> void:
-	# ダイアログが開いていた状態でも閉じれるよう、両方クリーンにする
+	# ダイアログ / キャプチャが開いていた状態でも閉じれるよう、全クリーン
 	_dialog.hide()
 	_main_panel.show()
 	_dialog_mode = ""
+	if _capture_action != "":
+		_end_capture()
 	hide()
 	get_tree().paused = false
 
@@ -228,13 +359,152 @@ func _show_settings() -> void:
 	_key_config_view.hide()
 	_refresh_settings()
 
-# キー設定（Phase 2 は読み取り専用表示。Phase 3 でリバインド UI 化予定）
+# キー設定（Phase 3：動的にリバインドボタンを生成）
 func _show_key_config() -> void:
 	_empty_view.hide()
 	_inventory_view.hide()
 	_quest_view.hide()
 	_settings_view.hide()
 	_key_config_view.show()
+	_populate_key_config()
+
+# Grid を一度クリアし、SettingsManager の ACTION_REGISTRY からヘッダ +
+# 各アクション 1 行を再構築する。
+# focus_action / focus_type が指定されていれば、再構築後に該当ボタンへ
+# フォーカスを戻す（リバインド成立時にフォーカスが nowhere になる問題対策）。
+func _populate_key_config(focus_action: String = "", focus_type: String = "") -> void:
+	# 古い子は remove_child で即時切り離してから queue_free
+	# （同じフレーム内で新規子を add する際にインデックスが安定する）
+	# 古いセルの dim / lock 記録もクリア（参照先が消えるため）
+	_dimmed_cells.clear()
+	_locked_cells.clear()
+	for child in _key_config_grid.get_children():
+		_key_config_grid.remove_child(child)
+		child.queue_free()
+	# ヘッダ
+	_add_header_label("操作")
+	_add_header_label("キー")
+	_add_header_label("パッド")
+	# 行
+	var focus_target: Control = null
+	for action_name in SettingsManager.ACTION_ORDER:
+		var def: Dictionary = SettingsManager.ACTION_REGISTRY[action_name]
+		# in_game=false のアクション (slot_delete 等) はゲーム中メニューに出さない
+		if not bool(def.get("in_game", true)):
+			continue
+		# アクション名
+		var name_label := Label.new()
+		name_label.text = def.get("display", action_name)
+		_key_config_grid.add_child(name_label)
+		# キー列
+		var kb_node: Control
+		if bool(def.get("kb_rebindable", false)):
+			var kb_btn := Button.new()
+			kb_btn.text = SettingsManager.get_keyboard_binding_name(action_name)
+			kb_btn.custom_minimum_size = Vector2(120, 0)
+			kb_btn.pressed.connect(_start_capture.bind(action_name, "kb"))
+			kb_node = kb_btn
+		else:
+			var lbl := Label.new()
+			lbl.text = "%s (固定)" % SettingsManager.get_keyboard_binding_name(action_name)
+			lbl.modulate = Color(0.7, 0.7, 0.7)
+			kb_node = lbl
+		_key_config_grid.add_child(kb_node)
+		if focus_action == action_name and focus_type == "kb" and kb_node is Button:
+			focus_target = kb_node
+		# パッド列
+		var pad_node: Control
+		if bool(def.get("pad_rebindable", false)):
+			var pad_btn := Button.new()
+			pad_btn.text = SettingsManager.get_gamepad_binding_name(action_name)
+			pad_btn.custom_minimum_size = Vector2(120, 0)
+			pad_btn.pressed.connect(_start_capture.bind(action_name, "pad"))
+			pad_node = pad_btn
+		else:
+			var lbl := Label.new()
+			lbl.text = "%s (固定)" % SettingsManager.get_gamepad_binding_name(action_name)
+			lbl.modulate = Color(0.7, 0.7, 0.7)
+			pad_node = lbl
+		_key_config_grid.add_child(pad_node)
+		if focus_action == action_name and focus_type == "pad" and pad_node is Button:
+			focus_target = pad_node
+	# フォーカス復帰（_populate 呼び出し元が指定した場合のみ）。
+	# レイアウト確定後に効くよう call_deferred。
+	if focus_target:
+		focus_target.call_deferred("grab_focus")
+	# 現在のデバイスに応じて lockout を再適用（再描画後）
+	if _active_device != "" and visible and _key_config_view.visible:
+		_apply_device_lockout()
+
+func _add_header_label(text: String) -> void:
+	var l := Label.new()
+	l.text = text
+	l.modulate = Color(0.85, 0.85, 0.85)
+	_key_config_grid.add_child(l)
+
+# リバインドキャプチャ開始
+func _start_capture(action: String, type_: String) -> void:
+	# 念のため前回キャプチャの残りを掃除
+	_restore_dimmed_cells()
+	_capture_action = action
+	_capture_type = type_
+	var def: Dictionary = SettingsManager.ACTION_REGISTRY[action]
+	var type_label := "キー" if type_ == "kb" else "パッド"
+	var hint := ""
+	if type_ == "pad":
+		hint = " (ボタン or LT/RT)"
+	_capture_message.text = "%s の %s を割り当てる入力を押してください%s" % [
+		def.get("display", action), type_label, hint]
+	# 「Esc でキャンセル」案内はキーボードキャプチャ時のみ表示
+	# （パッドキャプチャ中にキーボード案内を出すと違和感があるため）
+	_capture_hint.visible = (type_ == "kb")
+	_capture_overlay.show()
+	# キャプチャ対象でない側の列を薄表示
+	_dim_inactive_column(type_)
+
+func _end_capture() -> void:
+	_capture_action = ""
+	_capture_type = ""
+	_capture_overlay.hide()
+	_restore_dimmed_cells()
+
+# active_type が "kb" なら パッド列 (col index 2)、"pad" なら キー列 (col index 1) を
+# 薄表示する。Grid は columns=3 でヘッダ 3 セル + 行ごとに [name, kb, pad] の 3 セル。
+func _dim_inactive_column(active_type: String) -> void:
+	var dim_col := 2 if active_type == "kb" else 1
+	var dim_color := Color(0.4, 0.4, 0.4, 0.5)
+	var children := _key_config_grid.get_children()
+	var dimmed_count := 0
+	# ヘッダ (先頭 3 セル) はスキップ
+	for i in range(3, children.size()):
+		if i % 3 == dim_col:
+			var cell: Control = children[i]
+			_dimmed_cells.append([cell, cell.modulate])
+			cell.modulate = dim_color
+			dimmed_count += 1
+	print("[KeyConfig] dim_inactive_column: active=%s, dim_col=%d, dimmed=%d cells" % [
+		active_type, dim_col, dimmed_count])
+
+func _restore_dimmed_cells() -> void:
+	for pair in _dimmed_cells:
+		var cell: Control = pair[0]
+		var original: Color = pair[1]
+		if is_instance_valid(cell):
+			cell.modulate = original
+	_dimmed_cells.clear()
+
+# SettingsManager がリバインド / リセット後に発火するシグナル。
+# _capture_type は set_*_binding 内 emit 時点でまだクリアされていないため、
+# どの列（kb/pad）のボタンへフォーカスを戻すかが分かる。
+func _on_binding_changed(action: String) -> void:
+	if not (visible and _key_config_view.visible):
+		return
+	var focus_type := _capture_type  # _end_capture でクリアされる前に取り出す
+	_populate_key_config(action, focus_type)
+
+func _on_reset_bindings_pressed() -> void:
+	SettingsManager.reset_bindings()
+	# binding_changed が発火 → _populate_key_config で再描画される
 
 # 設定値（SettingsManager）と CheckBox 表示を同期する。
 # toggled シグナルが連鎖発火しないよう set_pressed_no_signal を使う。

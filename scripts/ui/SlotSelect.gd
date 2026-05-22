@@ -137,7 +137,10 @@ func _format_date(s: String) -> String:
 func _format_play_time(sec: int) -> String:
 	if sec <= 0:
 		return "0分"
+	# 時 / 分 は意図的な整数除算（小数切り捨ては仕様）
+	@warning_ignore("integer_division")
 	var h: int = sec / 3600
+	@warning_ignore("integer_division")
 	var m: int = (sec % 3600) / 60
 	var s: int = sec % 60
 	if h > 0:
