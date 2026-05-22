@@ -66,6 +66,7 @@ func _ready():
 	PlayerData.leveled_up.connect(_on_leveled_up)
 	# 装備変更で実効防御力が変わるので、ラベルを再描画する
 	PlayerData.equipment_changed.connect(_on_equipment_changed)
+	PlayerData.enhancements_changed.connect(_on_enhancements_changed)
 	_on_inventory_changed(PlayerData.inventory)
 	_on_level_changed(PlayerData.level, PlayerData.experience)
 
@@ -170,6 +171,9 @@ func _on_player_stats_changed(hp, max_hp, sp, max_sp):
 	_refresh_defense_label()
 
 func _on_equipment_changed(_eq: Dictionary) -> void:
+	_refresh_defense_label()
+
+func _on_enhancements_changed(_enh: Dictionary) -> void:
 	_refresh_defense_label()
 
 func _refresh_defense_label() -> void:

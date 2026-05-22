@@ -154,6 +154,8 @@ func _ready() -> void:
 	# 装備変更が外部要因（ロスト等）で起きた時にも UI を追従させる
 	PlayerData.equipment_changed.connect(_on_equipment_changed)
 	PlayerData.inventory_changed.connect(_on_inventory_changed)
+	# 強化値の変更（デバッグメニュー等）にも UI を追従させる
+	PlayerData.enhancements_changed.connect(_on_enhancements_changed)
 
 func _register_input_action() -> void:
 	# メニュー：E / ゲームパッド Start
@@ -527,7 +529,7 @@ func _on_auto_save_toggled(v: bool) -> void:
 # --- インベントリ ---
 
 func _refresh_inventory() -> void:
-	# 装備サマリ
+	# 装備サマリ（強化値 +N があれば末尾に付ける）
 	_equip_summary.text = "[装備] 武器:%s  盾:%s  アクセ:%s  投擲:%s" % [
 		_equip_label(PlayerData.SLOT_WEAPON),
 		_equip_label(PlayerData.SLOT_SHIELD),
@@ -563,6 +565,9 @@ func _equip_label(slot: String) -> String:
 	var key: String = PlayerData.equipped_in(slot)
 	if key == "":
 		return "なし"
+	var enhance: int = PlayerData.get_enhance(slot)
+	if enhance > 0:
+		return "%s+%d" % [Item.label_for(key), enhance]
 	return Item.label_for(key)
 
 func _on_item_selected(key: String) -> void:
@@ -580,7 +585,8 @@ func _on_item_selected(key: String) -> void:
 	_refresh_action_buttons()
 
 # 装備品の補正値を「攻撃 +3 / 防御 +2」のように整形する。
-# 補正値なし（お守り等）や装備不可アイテムでは空文字を返す（Label 自体は表示するが空表示）。
+# 装備中で強化値が乗っている場合は末尾に「(強化 +N)」を付ける。
+# 補正値なし（お守り等）や装備不可アイテムでは空文字を返す。
 func _stats_text_for(key: String) -> String:
 	var stats: Dictionary = Item.stats_for(key)
 	if stats.is_empty():
@@ -599,7 +605,14 @@ func _stats_text_for(key: String) -> String:
 			parts.append("%s +%d" % [label, int(stats[stat_key])])
 	if parts.is_empty():
 		return ""
-	return "効果: " + " / ".join(parts)
+	var text := "効果: " + " / ".join(parts)
+	# 装備中で強化値が乗っていれば末尾に追記
+	if PlayerData.is_equipped(key):
+		var slot: String = PlayerData.slot_for_kind(Item.kind_for(key))
+		var enhance: int = PlayerData.get_enhance(slot)
+		if enhance > 0:
+			text += " (強化 +%d)" % enhance
+	return text
 
 func _clear_detail() -> void:
 	_item_name.text   = ""
@@ -664,6 +677,14 @@ func _on_equipment_changed(_eq: Dictionary) -> void:
 func _on_inventory_changed(_inv: Dictionary) -> void:
 	if visible and _inventory_view.visible:
 		_refresh_inventory()
+
+# 強化値が変わったら装備サマリ・詳細・フッター（実効防御）を再描画
+func _on_enhancements_changed(_enh: Dictionary) -> void:
+	if not visible:
+		return
+	if _inventory_view.visible:
+		_refresh_inventory()
+	_refresh_status()
 
 # --- アクション ---
 
