@@ -163,6 +163,11 @@ text = ""
 layout_mode = 2
 text = ""
 
+[node name="StatsLabel" type="Label" parent="Panel/Margin/VBox/Body/InventoryView/Detail"]
+layout_mode = 2
+autowrap_mode = 2
+text = ""
+
 [node name="DescLabel" type="Label" parent="Panel/Margin/VBox/Body/InventoryView/Detail"]
 layout_mode = 2
 autowrap_mode = 2
@@ -333,6 +338,10 @@ text = "HP: -"
 [node name="SPLabel" type="Label" parent="Panel/Margin/VBox/StatusFooter"]
 layout_mode = 2
 text = "SP: -"
+
+[node name="DefenseLabel" type="Label" parent="Panel/Margin/VBox/StatusFooter"]
+layout_mode = 2
+text = "防御: -"
 
 [node name="HungerLabel" type="Label" parent="Panel/Margin/VBox/StatusFooter"]
 layout_mode = 2

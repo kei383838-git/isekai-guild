@@ -63,6 +63,7 @@ const MENU_TOGGLE_KEY := KEY_E
 @onready var _item_count: Label  = $Panel/Margin/VBox/Body/InventoryView/Detail/CountLabel
 @onready var _item_kind: Label   = $Panel/Margin/VBox/Body/InventoryView/Detail/KindLabel
 @onready var _item_status: Label = $Panel/Margin/VBox/Body/InventoryView/Detail/StatusLabel
+@onready var _item_stats: Label  = $Panel/Margin/VBox/Body/InventoryView/Detail/StatsLabel
 @onready var _item_desc: Label   = $Panel/Margin/VBox/Body/InventoryView/Detail/DescLabel
 
 # アクションボタン
@@ -83,11 +84,12 @@ const MENU_TOGGLE_KEY := KEY_E
 @onready var _quest_desc: Label     = $Panel/Margin/VBox/Body/QuestView/Active/DescLabel
 
 # ステータスフッター
-@onready var _stat_hp: Label     = $Panel/Margin/VBox/StatusFooter/HPLabel
-@onready var _stat_sp: Label     = $Panel/Margin/VBox/StatusFooter/SPLabel
-@onready var _stat_hunger: Label = $Panel/Margin/VBox/StatusFooter/HungerLabel
-@onready var _stat_gold: Label   = $Panel/Margin/VBox/StatusFooter/GoldLabel
-@onready var _stat_job: Label    = $Panel/Margin/VBox/StatusFooter/JobLabel
+@onready var _stat_hp: Label      = $Panel/Margin/VBox/StatusFooter/HPLabel
+@onready var _stat_sp: Label      = $Panel/Margin/VBox/StatusFooter/SPLabel
+@onready var _stat_defense: Label = $Panel/Margin/VBox/StatusFooter/DefenseLabel
+@onready var _stat_hunger: Label  = $Panel/Margin/VBox/StatusFooter/HungerLabel
+@onready var _stat_gold: Label    = $Panel/Margin/VBox/StatusFooter/GoldLabel
+@onready var _stat_job: Label     = $Panel/Margin/VBox/StatusFooter/JobLabel
 
 var _player: Node = null
 var _selected_item_key: String = ""
@@ -574,13 +576,37 @@ func _on_item_selected(key: String) -> void:
 		_item_status.text = "状態: %s スロットに装備中" % _slot_label(slot)
 	else:
 		_item_status.text = ""
+	_item_stats.text = _stats_text_for(key)
 	_refresh_action_buttons()
+
+# 装備品の補正値を「攻撃 +3 / 防御 +2」のように整形する。
+# 補正値なし（お守り等）や装備不可アイテムでは空文字を返す（Label 自体は表示するが空表示）。
+func _stats_text_for(key: String) -> String:
+	var stats: Dictionary = Item.stats_for(key)
+	if stats.is_empty():
+		return ""
+	var parts: Array[String] = []
+	# 表示順を固定するため Dict ではなく順序付きで処理
+	for entry in [
+		["attack",     "攻撃"],
+		["defense",    "防御"],
+		["evasion",    "回避"],
+		["throw_power", "投擲威力"],
+	]:
+		var stat_key: String = entry[0]
+		var label: String = entry[1]
+		if stats.has(stat_key):
+			parts.append("%s +%d" % [label, int(stats[stat_key])])
+	if parts.is_empty():
+		return ""
+	return "効果: " + " / ".join(parts)
 
 func _clear_detail() -> void:
 	_item_name.text   = ""
 	_item_count.text  = ""
 	_item_kind.text   = ""
 	_item_status.text = ""
+	_item_stats.text  = ""
 	_item_desc.text   = ""
 
 func _refresh_action_buttons() -> void:
@@ -626,10 +652,14 @@ func _slot_label(slot: String) -> String:
 		PlayerData.SLOT_THROW:     return "投擲"
 	return slot
 
-# 外部からの装備変更（ロスト等）に追従
+# 外部からの装備変更（ロスト等）に追従。
+# 実効防御力 (フッター表示) も装備で変わるので _refresh_status も呼ぶ。
 func _on_equipment_changed(_eq: Dictionary) -> void:
-	if visible and _inventory_view.visible:
+	if not visible:
+		return
+	if _inventory_view.visible:
 		_refresh_inventory()
+	_refresh_status()
 
 func _on_inventory_changed(_inv: Dictionary) -> void:
 	if visible and _inventory_view.visible:
@@ -816,12 +846,14 @@ func _refresh_status() -> void:
 	if _player == null or not is_instance_valid(_player):
 		_player = get_tree().get_first_node_in_group("player")
 	if _player != null and is_instance_valid(_player):
-		_stat_hp.text     = "HP: %d / %d"     % [_player.hp, _player.max_hp]
-		_stat_sp.text     = "SP: %d / %d"     % [_player.sp, _player.max_sp]
-		_stat_hunger.text = "満腹度: %d / %d" % [_player.hunger, _player.max_hunger]
+		_stat_hp.text      = "HP: %d / %d"     % [_player.hp, _player.max_hp]
+		_stat_sp.text      = "SP: %d / %d"     % [_player.sp, _player.max_sp]
+		_stat_defense.text = "防御: %d"         % _player.effective_defense()
+		_stat_hunger.text  = "満腹度: %d / %d" % [_player.hunger, _player.max_hunger]
 	else:
-		_stat_hp.text     = "HP: -"
-		_stat_sp.text     = "SP: -"
-		_stat_hunger.text = "満腹度: -"
+		_stat_hp.text      = "HP: -"
+		_stat_sp.text      = "SP: -"
+		_stat_defense.text = "防御: -"
+		_stat_hunger.text  = "満腹度: -"
 	_stat_gold.text = "ゴールド: %d" % QuestManager.gold
 	_stat_job.text  = "ジョブ: 戦士（暫定）"

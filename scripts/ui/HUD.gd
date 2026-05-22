@@ -13,11 +13,12 @@ extends CanvasLayer
 var gold_label: Label
 var quest_label: Label
 var level_label: Label
+var defense_label: Label
 # レベルアップ時の全画面フラッシュ。HUD.tscn は触らず動的に追加する。
 var _levelup_flash: ColorRect
 
 func _ready():
-	# 動的にゴールド・クエスト進捗・レベルラベルを追加（HUD.tscn は触らない）
+	# 動的にゴールド・クエスト進捗・レベルラベル・防御力ラベルを追加（HUD.tscn は触らない）
 	gold_label = Label.new()
 	gold_label.name = "GoldLabel"
 	_vbox.add_child(gold_label)
@@ -27,6 +28,9 @@ func _ready():
 	level_label = Label.new()
 	level_label.name = "LevelLabel"
 	_vbox.add_child(level_label)
+	defense_label = Label.new()
+	defense_label.name = "DefenseLabel"
+	_vbox.add_child(defense_label)
 
 	# レベルアップ用フラッシュ（最前面）
 	_levelup_flash = ColorRect.new()
@@ -60,6 +64,8 @@ func _ready():
 	PlayerData.level_changed.connect(_on_level_changed)
 	PlayerData.experience_changed.connect(_on_experience_changed)
 	PlayerData.leveled_up.connect(_on_leveled_up)
+	# 装備変更で実効防御力が変わるので、ラベルを再描画する
+	PlayerData.equipment_changed.connect(_on_equipment_changed)
 	_on_inventory_changed(PlayerData.inventory)
 	_on_level_changed(PlayerData.level, PlayerData.experience)
 
@@ -71,6 +77,7 @@ func _ready():
 		# 初期値を反映
 		_on_player_stats_changed(player.hp, player.max_hp, player.sp, player.max_sp)
 		_on_hunger_changed(player.hunger, player.max_hunger)
+		_refresh_defense_label()
 
 func _on_gold_changed(g: int) -> void:
 	if gold_label:
@@ -158,6 +165,21 @@ func _on_player_stats_changed(hp, max_hp, sp, max_sp):
 	sp_label.text = "SP: %d / %d" % [sp, max_sp]
 	sp_bar.max_value = max_sp
 	sp_bar.value = sp
+	# stats_changed は装備変更（base 値は不変、effective が変わる）でも発火するため、
+	# ここで防御力ラベルも追従させる。
+	_refresh_defense_label()
+
+func _on_equipment_changed(_eq: Dictionary) -> void:
+	_refresh_defense_label()
+
+func _refresh_defense_label() -> void:
+	if defense_label == null:
+		return
+	var player = get_tree().get_first_node_in_group("player")
+	if player and player.has_method("effective_defense"):
+		defense_label.text = "防御: %d" % player.effective_defense()
+	else:
+		defense_label.text = "防御: -"
 
 func _on_level_changed(level: int, experience: int) -> void:
 	_refresh_level_label(level, experience)
