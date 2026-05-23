@@ -92,7 +92,10 @@ const MENU_TOGGLE_KEY := KEY_E
 @onready var _stat_job: Label     = $Panel/Margin/VBox/StatusFooter/JobLabel
 
 var _player: Node = null
-var _selected_item_key: String = ""
+# 持ち物リストで選択中のスタックへの参照（{key, count, enhance}）。
+# Phase 4a 個別管理化に伴い、key 文字列ではなくスタック単位で選択を保持する。
+# 空 Dictionary は未選択。
+var _selected_stack: Dictionary = {}
 
 # 確認ダイアログのモード。
 # "continue_after_save": セーブ直後に「ゲームを続けますか？」を尋ねる
@@ -537,29 +540,32 @@ func _refresh_inventory() -> void:
 		_equip_label(PlayerData.SLOT_THROW),
 	]
 
-	# アイテムリスト
+	# アイテムリスト（スタック単位の行）。docs/system/inventory.md §5。
 	for child in _item_list.get_children():
 		child.queue_free()
-	var inv: Dictionary = PlayerData.inventory
+	var inv: Array = PlayerData.inventory
 	if inv.is_empty():
 		_item_empty_label.show()
 		_clear_detail()
-		_selected_item_key = ""
+		_selected_stack = {}
 		_refresh_action_buttons()
 		return
 	_item_empty_label.hide()
-	for key in inv:
+	for stack in inv:
 		var btn := Button.new()
-		var equip_tag := " (装備中)" if PlayerData.is_equipped(key) else ""
-		btn.text = "%s ×%d%s" % [Item.label_for(key), inv[key], equip_tag]
+		var equipped: bool = PlayerData.is_stack_equipped(stack)
+		var enhance: int = int(stack.enhance)
+		var enhance_tag: String = "+%d" % enhance if enhance > 0 else ""
+		var equip_tag: String = " (装備中)" if equipped else ""
+		btn.text = "%s%s ×%d%s" % [Item.label_for(stack.key), enhance_tag, int(stack.count), equip_tag]
 		btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		btn.pressed.connect(_on_item_selected.bind(key))
+		btn.pressed.connect(_on_stack_selected.bind(stack))
 		_item_list.add_child(btn)
-	# 既存選択を維持。無ければ先頭を自動選択
-	if _selected_item_key == "" or not inv.has(_selected_item_key):
-		_on_item_selected(inv.keys()[0])
+	# 既存選択を維持。スタックが消えていれば先頭を自動選択。
+	if _selected_stack.is_empty() or inv.find(_selected_stack) < 0:
+		_on_stack_selected(inv[0])
 	else:
-		_on_item_selected(_selected_item_key)
+		_on_stack_selected(_selected_stack)
 
 func _equip_label(slot: String) -> String:
 	var key: String = PlayerData.equipped_in(slot)
@@ -570,25 +576,30 @@ func _equip_label(slot: String) -> String:
 		return "%s+%d" % [Item.label_for(key), enhance]
 	return Item.label_for(key)
 
-func _on_item_selected(key: String) -> void:
-	_selected_item_key = key
-	_item_name.text  = Item.label_for(key)
-	_item_count.text = "所持数: %d" % PlayerData.get_count(key)
+func _on_stack_selected(stack: Dictionary) -> void:
+	_selected_stack = stack
+	var key: String = stack.key
+	var enhance: int = int(stack.enhance)
+	var name_text := Item.label_for(key)
+	if enhance > 0:
+		name_text += "+%d" % enhance
+	_item_name.text  = name_text
+	_item_count.text = "個数: %d" % int(stack.count)
 	_item_kind.text  = "種別: %s" % _kind_label(Item.kind_for(key))
 	_item_desc.text  = Item.desc_for(key)
-	if PlayerData.is_equipped(key):
+	if PlayerData.is_stack_equipped(stack):
 		var slot := PlayerData.slot_for_kind(Item.kind_for(key))
 		_item_status.text = "状態: %s スロットに装備中" % _slot_label(slot)
 	else:
 		_item_status.text = ""
-	_item_stats.text = _stats_text_for(key)
+	_item_stats.text = _stats_text_for(stack)
 	_refresh_action_buttons()
 
 # 装備品の補正値を「攻撃 +3 / 防御 +2」のように整形する。
-# 装備中で強化値が乗っている場合は末尾に「(強化 +N)」を付ける。
+# 強化値があれば末尾に「(強化 +N)」を付ける（装備中・未装備問わずスタック単位で表示）。
 # 補正値なし（お守り等）や装備不可アイテムでは空文字を返す。
-func _stats_text_for(key: String) -> String:
-	var stats: Dictionary = Item.stats_for(key)
+func _stats_text_for(stack: Dictionary) -> String:
+	var stats: Dictionary = Item.stats_for(stack.key)
 	if stats.is_empty():
 		return ""
 	var parts: Array[String] = []
@@ -606,12 +617,9 @@ func _stats_text_for(key: String) -> String:
 	if parts.is_empty():
 		return ""
 	var text := "効果: " + " / ".join(parts)
-	# 装備中で強化値が乗っていれば末尾に追記
-	if PlayerData.is_equipped(key):
-		var slot: String = PlayerData.slot_for_kind(Item.kind_for(key))
-		var enhance: int = PlayerData.get_enhance(slot)
-		if enhance > 0:
-			text += " (強化 +%d)" % enhance
+	var enhance: int = int(stack.enhance)
+	if enhance > 0:
+		text += " (強化 +%d)" % enhance
 	return text
 
 func _clear_detail() -> void:
@@ -623,17 +631,16 @@ func _clear_detail() -> void:
 	_item_desc.text   = ""
 
 func _refresh_action_buttons() -> void:
-	var key := _selected_item_key
-	if key == "":
+	if _selected_stack.is_empty():
 		_set_btn_enabled(_btn_use, false)
 		_set_btn_enabled(_btn_equip, false)
 		_set_btn_enabled(_btn_unequip, false)
 		_set_btn_enabled(_btn_throw, false)
 		_set_btn_enabled(_btn_drop, false)
 		return
-	var equipped := PlayerData.is_equipped(key)
-	var kind := Item.kind_for(key)
-	var has_slot := PlayerData.slot_for_kind(kind) != ""
+	var equipped: bool = PlayerData.is_stack_equipped(_selected_stack)
+	var kind: int = Item.kind_for(_selected_stack.key)
+	var has_slot: bool = PlayerData.slot_for_kind(kind) != ""
 
 	# 装備中は「外す」のみ可能。それ以外は kind に応じて出し分け。
 	_set_btn_enabled(_btn_use,     not equipped and kind == Item.Kind.FOOD)
@@ -674,12 +681,14 @@ func _on_equipment_changed(_eq: Dictionary) -> void:
 		_refresh_inventory()
 	_refresh_status()
 
-func _on_inventory_changed(_inv: Dictionary) -> void:
+# inventory_changed の引数は Array of stack（Phase 4a 個別管理化）。
+func _on_inventory_changed(_inv: Array) -> void:
 	if visible and _inventory_view.visible:
 		_refresh_inventory()
 
-# 強化値が変わったら装備サマリ・詳細・フッター（実効防御）を再描画
-func _on_enhancements_changed(_enh: Dictionary) -> void:
+# 強化値が変わったら装備サマリ・詳細・フッター（実効防御）を再描画。
+# 引数は equipment Dictionary（PlayerData がスタック参照を渡してくる）。
+func _on_enhancements_changed(_eq: Dictionary) -> void:
 	if not visible:
 		return
 	if _inventory_view.visible:
@@ -689,50 +698,50 @@ func _on_enhancements_changed(_enh: Dictionary) -> void:
 # --- アクション ---
 
 func _on_use_pressed() -> void:
-	var key := _selected_item_key
-	if key == "":
+	if _selected_stack.is_empty():
 		return
-	var kind := Item.kind_for(key)
+	var key: String = _selected_stack.key
+	var kind: int = Item.kind_for(key)
 	if kind == Item.Kind.FOOD:
-		var amt := Item.food_amount_for(key)
+		var amt: int = Item.food_amount_for(key)
 		if _player and is_instance_valid(_player):
 			_player.eat_food(amt)
-		PlayerData.remove_item(key, 1)
+		PlayerData.remove_stack(_selected_stack, 1)
 		LogManager.add_log("%s を食べた。満腹度 +%d" % [Item.label_for(key), amt])
 	_consume_turn_or_refresh()
 
 func _on_equip_pressed() -> void:
-	var key := _selected_item_key
-	if key == "":
+	if _selected_stack.is_empty():
 		return
-	if PlayerData.equip(key):
-		var slot := PlayerData.slot_for_kind(Item.kind_for(key))
-		LogManager.add_log("%s を %s に装備した。" % [Item.label_for(key), _slot_label(slot)])
+	var stack: Dictionary = _selected_stack
+	if PlayerData.equip_stack(stack):
+		var slot := PlayerData.slot_for_kind(Item.kind_for(stack.key))
+		LogManager.add_log("%s を %s に装備した。" % [Item.label_for(stack.key), _slot_label(slot)])
 	_consume_turn_or_refresh()
 
 func _on_unequip_pressed() -> void:
-	var key := _selected_item_key
-	if key == "":
+	if _selected_stack.is_empty():
 		return
-	var slot := PlayerData.slot_for_kind(Item.kind_for(key))
+	var key: String = _selected_stack.key
+	var slot: String = PlayerData.slot_for_kind(Item.kind_for(key))
 	if PlayerData.unequip(slot):
 		LogManager.add_log("%s を外した。" % Item.label_for(key))
 	_consume_turn_or_refresh()
 
 func _on_throw_pressed() -> void:
-	var key := _selected_item_key
-	if key == "":
+	if _selected_stack.is_empty():
 		return
-	# Phase 3 で投擲先・命中・効果を実装。現状は減算とログのみ。
-	PlayerData.remove_item(key, 1)
+	# Phase 4 で投擲先・命中・効果を実装。現状は減算とログのみ。
+	var key: String = _selected_stack.key
+	PlayerData.remove_stack(_selected_stack, 1)
 	LogManager.add_log("%s を投げた。" % Item.label_for(key))
 	_consume_turn_or_refresh()
 
 func _on_drop_pressed() -> void:
-	var key := _selected_item_key
-	if key == "":
+	if _selected_stack.is_empty():
 		return
-	PlayerData.remove_item(key, 1)
+	var key: String = _selected_stack.key
+	PlayerData.remove_stack(_selected_stack, 1)
 	LogManager.add_log("%s を捨てた。" % Item.label_for(key))
 	_consume_turn_or_refresh()
 

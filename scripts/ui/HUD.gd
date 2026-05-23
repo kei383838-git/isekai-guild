@@ -148,15 +148,22 @@ func _on_hunger_changed(hunger: int, max_hunger: int):
 	if hunger_label:
 		hunger_label.text = "Hunger: %d / %d" % [hunger, max_hunger]
 
-func _on_inventory_changed(inv: Dictionary):
-	if inventory_label:
-		if inv.is_empty():
-			inventory_label.text = "所持品: なし"
-		else:
-			var parts: Array = []
-			for type in inv:
-				parts.append("%s: %d" % [Item.label_for(type), inv[type]])
-			inventory_label.text = "所持品: " + ", ".join(parts)
+func _on_inventory_changed(inv: Array):
+	# inventory はスタックの配列。同 key の合計をまとめて表示する。
+	# docs/system/inventory.md §1。
+	if inventory_label == null:
+		return
+	if inv.is_empty():
+		inventory_label.text = "所持品: なし"
+		return
+	var totals: Dictionary = {}  # key → 合計 count
+	for stack in inv:
+		var k: String = stack.key
+		totals[k] = int(totals.get(k, 0)) + int(stack.count)
+	var parts: Array = []
+	for k in totals:
+		parts.append("%s: %d" % [Item.label_for(k), totals[k]])
+	inventory_label.text = "所持品: " + ", ".join(parts)
 
 func _on_player_stats_changed(hp, max_hp, sp, max_sp):
 	hp_label.text = "HP: %d / %d" % [hp, max_hp]

@@ -340,14 +340,15 @@ func _apply_loot_loss() -> void:
 	var rate: float = _loss_rate_for_difficulty(config.difficulty)
 	if rate <= 0.0:
 		return
-	# 所持品のロスト（割合で個数を切り詰め）
-	var keys: Array = PlayerData.inventory.keys().duplicate()
-	for key in keys:
-		var amount: int = PlayerData.inventory.get(key, 0)
+	# 所持品のロスト（スタック単位で割合分を切り詰める）
+	# docs/system/inventory.md §6。同 key でも +N 違いは別行として個別判定される。
+	var stacks_snapshot: Array = PlayerData.inventory.duplicate()  # 走査中に削除されてもよいよう複製
+	for stack in stacks_snapshot:
+		var amount: int = int(stack.count)
 		var lost: int = int(round(amount * rate))
 		if lost > 0:
-			PlayerData.remove_item(key, lost)
-			LogManager.add_log("%s を %d 個 失った…" % [Item.label_for(key), lost])
+			PlayerData.remove_stack(stack, lost)
+			LogManager.add_log("%s を %d 個 失った…" % [Item.label_for(stack.key), lost])
 	# ゴールドのロスト
 	var gold_lost: int = int(round(QuestManager.gold * rate))
 	if gold_lost > 0:
