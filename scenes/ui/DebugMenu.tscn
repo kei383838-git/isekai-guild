@@ -1,4 +1,4 @@
-[gd_scene load_steps=2 format=3 uid="uid://b9dbgmenu1xyz0"]
+[gd_scene load_steps=2 format=3 uid="uid://cndnlf1lgi340"]
 
 [ext_resource type="Script" path="res://scripts/ui/DebugMenu.gd" id="1_dmenu"]
 
