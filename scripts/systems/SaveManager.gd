@@ -284,9 +284,13 @@ func _write_slot(slot: int, data: Dictionary) -> bool:
 	return true
 
 func _snapshot_player_data() -> Dictionary:
+	# inventory + equipment はスタック参照ベースのため PlayerData 側のヘルパで
+	# シリアライズする（equipment はインデックスで保存される）。
+	# docs/system/inventory.md §7。
+	var inv_data: Dictionary = PlayerData.serialize_for_save()
 	return {
-		"inventory": PlayerData.inventory.duplicate(),
-		"equipment": PlayerData.equipment.duplicate(),
+		"inventory": inv_data["inventory"],
+		"equipment_index": inv_data["equipment_index"],
 		"job": PlayerData.job,
 		"level": PlayerData.level,
 		"experience": PlayerData.experience,
@@ -305,24 +309,16 @@ func _snapshot_quest_manager() -> Dictionary:
 	}
 
 func _restore_player_data(d: Dictionary) -> void:
-	var inv: Dictionary = (d.get("inventory", {}) as Dictionary).duplicate()
-	# JSON 経由で int が float になることがあるので明示的にキャスト
-	for k in inv:
-		inv[k] = int(inv[k])
-	PlayerData.inventory = inv
-	var eq: Dictionary = (d.get("equipment", {}) as Dictionary).duplicate()
-	for slot in PlayerData.ALL_SLOTS:
-		if not eq.has(slot):
-			eq[slot] = null
-	PlayerData.equipment = eq
+	# inventory + equipment は PlayerData 側のデシリアライザに委譲する。
+	# 新形式 (Array) / 旧形式 (Dictionary) の自動判定と
+	# 旧 enhancements の破棄を含む（docs/system/inventory.md §7）。
+	PlayerData.deserialize_from_save(d)
 	# レベル系（旧スロットには無いキーがあり得るので default を用意）
 	PlayerData.job = String(d.get("job", "warrior"))
 	PlayerData.level = int(d.get("level", 1))
 	PlayerData.experience = int(d.get("experience", 0))
 	PlayerData.stashed_level = int(d.get("stashed_level", -1))
 	PlayerData.stashed_experience = int(d.get("stashed_experience", 0))
-	PlayerData.inventory_changed.emit(PlayerData.inventory)
-	PlayerData.equipment_changed.emit(PlayerData.equipment)
 	PlayerData.level_changed.emit(PlayerData.level, PlayerData.experience)
 	PlayerData.experience_changed.emit(
 		PlayerData.experience,

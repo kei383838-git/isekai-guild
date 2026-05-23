@@ -125,6 +125,21 @@ static func stats_for(item_type_key: String) -> Dictionary:
 static func stat_for(item_type_key: String, stat_name: String) -> int:
 	return int(stats_for(item_type_key).get(stat_name, 0))
 
+# kind 単位でのスタッキング可否判定。
+# docs/system/inventory.md §2 のルールに対応：
+#   FOOD / THROW / MISC → スタック可
+#   WEAPON / SHIELD / ACCESSORY → 個別管理（+N 保持のため）
+static func is_stackable_kind(kind: int) -> bool:
+	match kind:
+		Kind.FOOD, Kind.THROW, Kind.MISC:
+			return true
+		Kind.WEAPON, Kind.SHIELD, Kind.ACCESSORY:
+			return false
+	return true  # 未知 kind は安全側でスタック可
+
+static func is_stackable(item_type_key: String) -> bool:
+	return is_stackable_kind(kind_for(item_type_key))
+
 func _ready():
 	add_to_group("items")
 	if sprite:
