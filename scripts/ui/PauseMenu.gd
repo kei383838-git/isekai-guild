@@ -562,7 +562,8 @@ func _refresh_inventory() -> void:
 		btn.pressed.connect(_on_stack_selected.bind(stack))
 		_item_list.add_child(btn)
 	# 既存選択を維持。スタックが消えていれば先頭を自動選択。
-	if _selected_stack.is_empty() or inv.find(_selected_stack) < 0:
+	# Dict == は内容比較になるため index_of_stack (参照比較) を使う。
+	if _selected_stack.is_empty() or PlayerData.index_of_stack(_selected_stack) < 0:
 		_on_stack_selected(inv[0])
 	else:
 		_on_stack_selected(_selected_stack)

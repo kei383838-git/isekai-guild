@@ -67,6 +67,17 @@ var stashed_experience: int = 0
 static func make_stack(key: String, count: int = 1, enhance: int = 0) -> Dictionary:
 	return {"key": key, "count": max(1, count), "enhance": max(0, enhance)}
 
+# GDScript の Dictionary は == で内容比較されるため、参照（インスタンス同一性）の
+# 比較には is_same() を使う。同じ内容の別スタックを誤判定しないために
+# inventory / equipment への問い合わせは全てこのヘルパを経由する。
+func index_of_stack(stack: Dictionary) -> int:
+	if stack == null or stack.is_empty():
+		return -1
+	for i in inventory.size():
+		if is_same(inventory[i], stack):
+			return i
+	return -1
+
 # --- inventory ---
 
 # アイテムを加算する。docs/system/inventory.md §2 のスタッキング規則に従う：
@@ -110,9 +121,7 @@ func add_item(key: String, amount: int = 1, enhance: int = 0) -> Dictionary:
 func remove_stack(stack: Dictionary, amount: int = 1) -> bool:
 	if amount <= 0:
 		return true
-	if stack == null or stack.is_empty():
-		return false
-	var idx: int = inventory.find(stack)
+	var idx: int = index_of_stack(stack)
 	if idx < 0:
 		return false
 	var new_count: int = int(stack.count) - amount
@@ -146,6 +155,8 @@ func remove_item(key: String, amount: int = 1) -> bool:
 # 指定 key のスタックを列挙する。equipped_filter:
 #   false → 装備されていないスタックのみ
 #   true  → 装備中のスタックのみ
+# is_stack_equipped が is_same() で参照比較しているため、同 key 同内容でも
+# 装備中のスタックだけを正しく分別できる。
 func _stacks_with_key(key: String, equipped_filter: bool) -> Array:
 	var result: Array = []
 	for stack in inventory:
@@ -199,14 +210,12 @@ func slot_for_kind(kind: int) -> String:
 # 既に他のものが装備されているスロットは上書きされる（外したスタックは inventory に残る）。
 # 成功時 true。
 func equip_stack(stack: Dictionary) -> bool:
-	if stack == null or stack.is_empty():
-		return false
-	if inventory.find(stack) < 0:
+	if index_of_stack(stack) < 0:
 		return false
 	var slot := slot_for_kind(Item.kind_for(stack.key))
 	if slot == "":
 		return false
-	if equipment[slot] == stack:
+	if is_same(equipment[slot], stack):
 		return false  # 既に装備中
 	equipment[slot] = stack
 	equipment_changed.emit(equipment)
@@ -230,10 +239,13 @@ func unequip(slot: String) -> bool:
 	enhancements_changed.emit(equipment)
 	return true
 
-# 指定スタックが装備中か。
+# 指定スタックが装備中か。is_same() で参照比較するため、同 key 同内容の別スタックを
+# 取り違えない（Dict の == は内容比較になるので使わない）。
 func is_stack_equipped(stack: Dictionary) -> bool:
+	if stack == null or stack.is_empty():
+		return false
 	for v in equipment.values():
-		if v == stack:
+		if v != null and is_same(v, stack):
 			return true
 	return false
 
@@ -305,10 +317,11 @@ func _has_primary_stat(item_key: String) -> bool:
 	return false
 
 # inventory から消えたスタックが装備されていた場合、自動で外す（内部利用）。
+# 参照比較 (is_same) で同 key 同内容の別スタックを取り違えないようにする。
 func _auto_unequip_stack(stack: Dictionary) -> void:
 	var changed := false
 	for slot in equipment:
-		if equipment[slot] == stack:
+		if equipment[slot] != null and is_same(equipment[slot], stack):
 			equipment[slot] = null
 			changed = true
 	if changed:
@@ -318,7 +331,7 @@ func _auto_unequip_stack(stack: Dictionary) -> void:
 # --- セーブ用 ---
 
 # inventory + equipment をシリアライズ用 Dictionary に変換する。
-# equipment は参照ベースなので、index に変換して保存する。
+# equipment は参照ベースなので、index_of_stack で正しい index に変換して保存する。
 func serialize_for_save() -> Dictionary:
 	var inv_copy: Array = []
 	for stack in inventory:
@@ -326,7 +339,7 @@ func serialize_for_save() -> Dictionary:
 	var equip_idx: Dictionary = {}
 	for slot in ALL_SLOTS:
 		var s = equipment[slot]
-		equip_idx[slot] = inventory.find(s) if s != null else -1
+		equip_idx[slot] = index_of_stack(s) if s != null else -1
 	return {
 		"inventory": inv_copy,
 		"equipment_index": equip_idx,
