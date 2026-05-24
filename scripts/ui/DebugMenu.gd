@@ -15,7 +15,6 @@ extends CanvasLayer
 const TOGGLE_KEY := KEY_F11
 
 # 静的ノード
-@onready var _panel: Panel = $Panel
 @onready var _item_option: OptionButton = $Panel/Margin/VBox/Scroll/Inner/ItemSection/Row/ItemOption
 @onready var _qty_spin: SpinBox          = $Panel/Margin/VBox/Scroll/Inner/ItemSection/Row/QtySpin
 @onready var _give_btn: Button           = $Panel/Margin/VBox/Scroll/Inner/ItemSection/Row/GiveButton
