@@ -70,14 +70,22 @@ const DEFS := {
 	},
 }
 
-# 種別ごとのフィールド表示色（仮置き。本素材投入時に廃止予定）
-const KIND_COLORS := {
-	Kind.FOOD:      Color(0.4, 0.9, 0.4),
-	Kind.WEAPON:    Color(0.95, 0.4, 0.3),
-	Kind.SHIELD:    Color(0.4, 0.6, 0.95),
-	Kind.ACCESSORY: Color(0.95, 0.85, 0.3),
-	Kind.THROW:     Color(0.6, 0.85, 0.95),
-	Kind.MISC:      Color(0.85, 0.75, 0.3),
+# 床表示アイコン（kind フォールバック）。
+# assets/items/floor/floor_item_*_64.png は kind 単位の共通アイコン。
+# docs/system/asset_wishlist.md E-1 / E-3。
+const FLOOR_KIND_TEXTURES := {
+	Kind.FOOD:      "res://assets/items/floor/floor_item_food_64.png",
+	Kind.WEAPON:    "res://assets/items/floor/floor_item_weapon_64.png",
+	Kind.SHIELD:    "res://assets/items/floor/floor_item_shield_64.png",
+	Kind.ACCESSORY: "res://assets/items/floor/floor_item_accessory_64.png",
+	Kind.THROW:     "res://assets/items/floor/floor_item_stone_64.png",
+	Kind.MISC:      "res://assets/items/floor/floor_item_gold_64.png",
+}
+
+# key 単位の個別床テクスチャ。kind フォールバックより優先される。
+# 個別アイコン（assets/items/icons/<key>_icon_64.png）導入時はそちらへ移行する。
+const FLOOR_TEXTURES_BY_KEY := {
+	"herb": "res://assets/items/floor/floor_item_herb_64.png",
 }
 
 @export var item_type: String = "herb"
@@ -140,7 +148,20 @@ static func is_stackable_kind(kind: int) -> bool:
 static func is_stackable(item_type_key: String) -> bool:
 	return is_stackable_kind(kind_for(item_type_key))
 
+# 床表示アイコンを返す。key 単位の個別テクスチャがあればそれ、無ければ kind 単位。
+# 該当テクスチャが無ければ null（呼び元で modulate やフォールバックを使う想定）。
+static func floor_texture_for(item_type_key: String) -> Texture2D:
+	if FLOOR_TEXTURES_BY_KEY.has(item_type_key):
+		return load(FLOOR_TEXTURES_BY_KEY[item_type_key]) as Texture2D
+	var k: int = kind_for(item_type_key)
+	if FLOOR_KIND_TEXTURES.has(k):
+		return load(FLOOR_KIND_TEXTURES[k]) as Texture2D
+	return null
+
 func _ready():
 	add_to_group("items")
 	if sprite:
-		sprite.modulate = KIND_COLORS.get(kind_for(item_type), Color.WHITE)
+		var tex: Texture2D = floor_texture_for(item_type)
+		if tex:
+			sprite.texture = tex
+			sprite.modulate = Color.WHITE
