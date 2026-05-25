@@ -732,10 +732,17 @@ func _on_unequip_pressed() -> void:
 func _on_throw_pressed() -> void:
 	if _selected_stack.is_empty():
 		return
-	# Phase 4 で投擲先・命中・効果を実装。現状は減算とログのみ。
+	# 投擲ロジックは Player.throw_item に委譲する
+	# （壁 / 敵 / 床落下・命中ダメージ・スタック減算を内包）。
+	# docs/system/combat.md / equipment.md。
 	var key: String = _selected_stack.key
-	PlayerData.remove_stack(_selected_stack, 1)
-	LogManager.add_log("%s を投げた。" % Item.label_for(key))
+	var label: String = Item.label_for(key)
+	LogManager.add_log("%s を投げた。" % label)
+	if _player != null and is_instance_valid(_player) and _player.has_method("throw_item"):
+		_player.throw_item(_selected_stack)
+	else:
+		# フォールバック（村など Player なし / メソッド未実装）：減算のみ
+		PlayerData.remove_stack(_selected_stack, 1)
 	_consume_turn_or_refresh()
 
 func _on_drop_pressed() -> void:

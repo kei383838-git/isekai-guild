@@ -8,6 +8,13 @@ signal died
 const TILE_SIZE: int = 64
 const DASH_MAX_STEPS := 20
 
+# 投擲：射程と既定ダメージ。
+# 射程：壁 / 敵に当たるまで最大 10 マス（シレン系慣習）。
+# 既定ダメージ：throw_power が設定されていないアイテム（薬草等）を投げた時の固定値。
+# docs/system/combat.md / equipment.md。
+const THROW_MAX_RANGE := 10
+const THROW_DEFAULT_DAMAGE := 5
+
 # リソース変動の周期（ターン）
 const HUNGER_TICK_INTERVAL := 10  # 10 ターンごとに満腹度 -1
 const SP_RECOVER_INTERVAL := 5    # 5 ターンごとに SP +1
@@ -304,6 +311,65 @@ func attack() -> void:
 	if target and target.has_method("receive_attack"):
 		target.receive_attack(effective_attack())
 	# 空振り時はログを出さない（モーションだけで十分なため）
+
+# 投擲アクション。指定スタックを向き先へ飛ばす。
+# - 射程：壁 / 敵に当たるまで最大 THROW_MAX_RANGE マス
+# - 命中：敵にダメージを与えて消滅（receive_attack 経由で回避・防御も処理される）
+# - 空振り：着弾点（壁の手前 or 最大射程到達点）に Item インスタンスを生成して床に落とす
+# - アイテムの減算は本メソッド内で行う（呼び元では行わない）
+# - 食料等の throw_power 未設定アイテムは THROW_DEFAULT_DAMAGE で扱う
+# docs/system/combat.md / equipment.md。
+func throw_item(stack: Dictionary) -> void:
+	if stack == null or stack.is_empty():
+		return
+	var key: String = stack.key
+	var label: String = Item.label_for(key)
+	var dir: Vector2i = _facing_to_vector()
+	if dir == Vector2i.ZERO:
+		return
+	var cur_tile: Vector2i = tile_pos
+	for _i in range(THROW_MAX_RANGE):
+		var next_tile: Vector2i = cur_tile + dir
+		# 壁（床がない）→ 手前の cur_tile に落下
+		if floor_layer != null and floor_layer.get_cell_source_id(next_tile) == -1:
+			_drop_thrown_item(stack, cur_tile, label)
+			return
+		# 敵命中
+		var enemy = _find_enemy_at_tile(next_tile)
+		if enemy != null:
+			_hit_thrown_item(stack, enemy, key, label)
+			return
+		cur_tile = next_tile
+	# 最大射程まで届く → そこに落下
+	_drop_thrown_item(stack, cur_tile, label)
+
+func _throw_damage_for(key: String) -> int:
+	var power: int = Item.stat_for(key, "throw_power")
+	if power > 0:
+		return power
+	return THROW_DEFAULT_DAMAGE
+
+func _hit_thrown_item(stack: Dictionary, enemy: Node, key: String, label: String) -> void:
+	PlayerData.remove_stack(stack, 1)
+	LogManager.add_log("%s が当たった！" % label)
+	if enemy.has_method("receive_attack"):
+		enemy.receive_attack(_throw_damage_for(key))
+
+func _drop_thrown_item(stack: Dictionary, tile: Vector2i, label: String) -> void:
+	PlayerData.remove_stack(stack, 1)
+	var item_scene = load("res://scenes/item/Item.tscn")
+	if item_scene == null:
+		LogManager.add_log("%s は消えてしまった。" % label)
+		return
+	var item = item_scene.instantiate()
+	item.item_type = stack.key
+	item.amount = 1
+	var parent: Node = get_parent()
+	if parent == null:
+		parent = get_tree().current_scene
+	parent.add_child(item)
+	item.position = Vector2(tile) * TILE_SIZE
+	LogManager.add_log("%s が落ちた。" % label)
 
 # 攻撃を受ける。回避判定 → ダメージ計算 → take_damage の順。
 # docs/system/combat.md §7。式は Combat.gd に集約。

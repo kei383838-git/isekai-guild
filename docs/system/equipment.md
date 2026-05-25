@@ -81,7 +81,7 @@
 | wooden_sword | 武器 | 攻撃 +3 | 序盤武器 |
 | wooden_shield | 盾 | 防御 +2 | 序盤盾 |
 | talisman | アクセサリー | （補正値なし） | 効果は Phase 4 で [loot_loss.md](loot_loss.md) §8 のロスト 1 回防止を実装 |
-| throw_stone | 投擲 | throw_power 4 | 投擲攻撃のダメージ源（Phase 4 で攻撃挙動を実装） |
+| throw_stone | 投擲 | throw_power 4 | 投擲攻撃のダメージ源（[combat.md §6.5](combat.md#65-投擲) で実装済み） |
 | power_ring（力の指輪） | アクセサリー | 攻撃 +2 | |
 | guard_ring（守りの指輪） | アクセサリー | 防御 +2 | |
 | swift_ring（素早さの指輪） | アクセサリー | 回避 +5 | |
