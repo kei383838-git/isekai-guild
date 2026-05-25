@@ -119,6 +119,13 @@ var _dimmed_cells: Array = []
 # 逆側の列を disabled + 薄表示にする（誤操作防止）。
 var _active_device: String = ""
 
+# 強化素材を「使う」と表示される対象選択モードの状態。
+# _enhance_material_stack: 使用中の素材スタック（空＝モード解除）
+# _enhance_picker_panel:   動的生成された選択パネル（Body の子）
+# docs/system/equipment.md §6.1.1。
+var _enhance_material_stack: Dictionary = {}
+var _enhance_picker_panel: Control = null
+
 # デバイス lockout 中に disabled / dim にしたセル一覧。
 # 各 entry: { "cell": Control, "modulate": Color, "disabled"?: bool }
 var _locked_cells: Array = []
@@ -644,7 +651,9 @@ func _refresh_action_buttons() -> void:
 	var has_slot: bool = PlayerData.slot_for_kind(kind) != ""
 
 	# 装備中は「外す」のみ可能。それ以外は kind に応じて出し分け。
-	_set_btn_enabled(_btn_use,     not equipped and kind == Item.Kind.FOOD)
+	# FOOD（食べる）と MATERIAL（強化素材＝対象選択へ）が「使う」の対象。
+	var can_use: bool = not equipped and (kind == Item.Kind.FOOD or kind == Item.Kind.MATERIAL)
+	_set_btn_enabled(_btn_use,     can_use)
 	_set_btn_enabled(_btn_equip,   not equipped and has_slot)
 	_set_btn_enabled(_btn_unequip, equipped)
 	_set_btn_enabled(_btn_throw,   not equipped)
@@ -663,6 +672,7 @@ func _kind_label(kind: int) -> String:
 		Item.Kind.ACCESSORY: return "アクセサリー"
 		Item.Kind.THROW:     return "投擲"
 		Item.Kind.MISC:      return "その他"
+		Item.Kind.MATERIAL:  return "強化素材"
 	return ""
 
 func _slot_label(slot: String) -> String:
@@ -709,7 +719,115 @@ func _on_use_pressed() -> void:
 			_player.eat_food(amt)
 		PlayerData.remove_stack(_selected_stack, 1)
 		LogManager.add_log("%s を食べた。満腹度 +%d" % [Item.label_for(key), amt])
+		_consume_turn_or_refresh()
+		return
+	if kind == Item.Kind.MATERIAL:
+		# 強化素材：対象選択モードへ。ここではターン消費しない（適用時に消費）。
+		_open_enhance_picker(_selected_stack)
+		return
+	# その他の kind は use の対象外（既存挙動を維持）
 	_consume_turn_or_refresh()
+
+# --- 強化素材の対象選択モード（docs/system/equipment.md §6.1.1） ---
+
+# 強化素材を「使う」と呼ばれる。enhance_target に対応する kind の装備品スタックを
+# 列挙して、動的パネルで選択させる。候補が無ければログだけ出して何もしない
+# （素材は消費しない、ターンも消費しない）。
+func _open_enhance_picker(material_stack: Dictionary) -> void:
+	var target_slot: String = Item.enhance_target_for(material_stack.key)
+	if target_slot == "":
+		return
+	var target_kind: int = -1
+	match target_slot:
+		PlayerData.SLOT_WEAPON:    target_kind = Item.Kind.WEAPON
+		PlayerData.SLOT_SHIELD:    target_kind = Item.Kind.SHIELD
+		PlayerData.SLOT_ACCESSORY: target_kind = Item.Kind.ACCESSORY
+	if target_kind < 0:
+		return
+	# 該当 kind かつ強化可能（主 stat あり）のスタック
+	var candidates: Array = []
+	for stack in PlayerData.inventory:
+		if Item.kind_for(stack.key) != target_kind:
+			continue
+		if not Item.has_primary_stat(stack.key):
+			continue
+		candidates.append(stack)
+	if candidates.is_empty():
+		LogManager.add_log("強化できる%sを持っていない。" % _slot_label(target_slot))
+		return
+	_enhance_material_stack = material_stack
+	_build_enhance_picker_panel(material_stack, candidates)
+
+# 中央コンテンツを一旦隠し、強化対象選択用の VBox を動的生成する。
+func _build_enhance_picker_panel(material_stack: Dictionary, candidates: Array) -> void:
+	_empty_view.hide()
+	_inventory_view.hide()
+	_quest_view.hide()
+	_settings_view.hide()
+	_key_config_view.hide()
+	var body: Container = $Panel/Margin/VBox/Body
+	_enhance_picker_panel = VBoxContainer.new()
+	_enhance_picker_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_enhance_picker_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_enhance_picker_panel.add_theme_constant_override("separation", 8)
+	body.add_child(_enhance_picker_panel)
+	# タイトル
+	var title := Label.new()
+	title.text = "%s を使う対象を選んでください。" % Item.label_for(material_stack.key)
+	_enhance_picker_panel.add_child(title)
+	# 候補リスト
+	var scroll := ScrollContainer.new()
+	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_enhance_picker_panel.add_child(scroll)
+	var list := VBoxContainer.new()
+	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(list)
+	var first_btn: Button = null
+	for stack in candidates:
+		var btn := Button.new()
+		var equipped: bool = PlayerData.is_stack_equipped(stack)
+		var enhance: int = int(stack.enhance)
+		var equip_tag: String = " (装備中)" if equipped else ""
+		btn.text = "%s +%d → +%d%s" % [Item.label_for(stack.key), enhance, enhance + 1, equip_tag]
+		btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		btn.pressed.connect(_on_enhance_target_selected.bind(stack))
+		list.add_child(btn)
+		if first_btn == null:
+			first_btn = btn
+	# キャンセル
+	var cancel := Button.new()
+	cancel.text = "キャンセル"
+	cancel.pressed.connect(_close_enhance_picker)
+	_enhance_picker_panel.add_child(cancel)
+	if first_btn != null:
+		first_btn.grab_focus()
+	else:
+		cancel.grab_focus()
+
+# 対象選択確定。強化素材を 1 個消費 → enhance_stack で +1 → ターン消費。
+func _on_enhance_target_selected(target_stack: Dictionary) -> void:
+	if _enhance_material_stack.is_empty():
+		return
+	var material: Dictionary = _enhance_material_stack
+	var label_m: String = Item.label_for(material.key)
+	var label_t: String = Item.label_for(target_stack.key)
+	if not PlayerData.enhance_stack(target_stack, 1):
+		LogManager.add_log("強化に失敗した。")
+		_close_enhance_picker()
+		return
+	PlayerData.remove_stack(material, 1)
+	LogManager.add_log("%s で %s を強化した。 (+%d)" % [label_m, label_t, int(target_stack.enhance)])
+	_close_enhance_picker()
+	_consume_turn_or_refresh()
+
+# 対象選択モードを終了。動的パネルを破棄し、持ち物ビューに戻す。
+func _close_enhance_picker() -> void:
+	if _enhance_picker_panel != null and is_instance_valid(_enhance_picker_panel):
+		_enhance_picker_panel.queue_free()
+	_enhance_picker_panel = null
+	_enhance_material_stack = {}
+	_show_inventory()
 
 func _on_equip_pressed() -> void:
 	if _selected_stack.is_empty():

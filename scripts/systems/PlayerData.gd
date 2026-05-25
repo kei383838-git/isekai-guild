@@ -300,7 +300,7 @@ func set_enhance(slot: String, value: int) -> void:
 	var stack = equipment.get(slot, null)
 	if stack == null:
 		return
-	if not _has_primary_stat(stack.key):
+	if not Item.has_primary_stat(stack.key):
 		return
 	var clamped: int = max(0, value)
 	if clamped == int(stack.enhance):
@@ -308,13 +308,21 @@ func set_enhance(slot: String, value: int) -> void:
 	stack.enhance = clamped
 	enhancements_changed.emit(equipment)
 
-# 装備が「主 stat」を持つか（強化対象か）。stats が空 or 全 0 なら false。
-func _has_primary_stat(item_key: String) -> bool:
-	var stats: Dictionary = Item.stats_for(item_key)
-	for v in stats.values():
-		if int(v) != 0:
-			return true
-	return false
+# 指定スタックの強化値を amount だけ加算する。主 stat を持たない装備（お守り等）は
+# 強化対象外で false を返す。inventory に存在しないスタックも false。
+# 成功時 true、enhancements_changed を発火する。
+# 強化素材アイテム（Kind.MATERIAL）から呼ばれることを想定（docs/system/equipment.md §6.1.1）。
+# 上限は設けない（+99 想定だが運用ルールは UI 側で表現）。
+func enhance_stack(stack: Dictionary, amount: int = 1) -> bool:
+	if amount == 0:
+		return false
+	if index_of_stack(stack) < 0:
+		return false
+	if not Item.has_primary_stat(stack.key):
+		return false
+	stack.enhance = max(0, int(stack.enhance) + amount)
+	enhancements_changed.emit(equipment)
+	return true
 
 # inventory から消えたスタックが装備されていた場合、自動で外す（内部利用）。
 # 参照比較 (is_same) で同 key 同内容の別スタックを取り違えないようにする。

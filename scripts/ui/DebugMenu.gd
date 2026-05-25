@@ -110,7 +110,7 @@ func _build_slot_row(slot: String) -> HBoxContainer:
 		label.modulate = Color(0.7, 0.7, 0.7)
 		row.add_child(label)
 		return row
-	var has_primary: bool = PlayerData._has_primary_stat(key)
+	var has_primary: bool = Item.has_primary_stat(key)
 	if not has_primary:
 		label.text = "%s: %s (強化対象外)" % [slot_disp, Item.label_for(key)]
 		label.modulate = Color(0.7, 0.7, 0.7)

@@ -23,6 +23,7 @@
 | FOOD | ○ | 薬草、食料 |
 | THROW | ○ | 投石など |
 | MISC | ○ | ゴールド等 |
+| MATERIAL | ○ | 強化素材（equipment.md §6.1.2） |
 | WEAPON | × | 個別管理（+N 保持） |
 | SHIELD | × | 個別管理（+N 保持） |
 | ACCESSORY | × | 個別管理（+N 保持） |
@@ -83,6 +84,7 @@ is_stack_equipped(stack: Dictionary) -> bool                             # 装�
 get_equipped_stack(slot: String) -> Dictionary                           # スロット → スタック
 get_enhance(slot: String) -> int                                         # 装備中スタックの +N
 set_enhance(slot: String, value: int) -> void                            # +N 設定（デバッグ用）
+enhance_stack(stack: Dictionary, amount: int = 1) -> bool                # スタックの +N を加算（強化素材経由）
 
 # 互換維持
 remove_item(key: String, amount: int = 1) -> bool                        # 同 key の任意スタックから減算

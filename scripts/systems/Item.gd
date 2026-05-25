@@ -3,7 +3,8 @@ class_name Item
 
 # アイテム種別。装備スロットへの対応付けは PlayerData.slot_for_kind() で行う。
 # 詳細は docs/system/equipment.md。
-enum Kind { FOOD, WEAPON, SHIELD, ACCESSORY, THROW, MISC }
+# MATERIAL は強化素材（Phase 4b）。「使う」と装備品強化のための対象選択へ進む。
+enum Kind { FOOD, WEAPON, SHIELD, ACCESSORY, THROW, MISC, MATERIAL }
 
 # アイテム定義表。新しいアイテムはここに行を足す。
 # label : 表示名
@@ -67,6 +68,21 @@ const DEFS := {
 		"label": "ゴールド",
 		"kind": Kind.MISC,
 		"desc": "通貨。",
+	},
+	# --- 強化素材（Phase 4b、docs/system/equipment.md §6.1.1） ---
+	# 「使う」と enhance_target に対応する装備品の対象選択 UI が開く。
+	# 成功率 100%、装備の主 stat に +1 加算（上限 +99）。
+	"weapon_enhance_stone": {
+		"label": "武器強化の石",
+		"kind": Kind.MATERIAL,
+		"desc": "武器に振りかけると性能が増す石。",
+		"enhance_target": "weapon",
+	},
+	"shield_enhance_stone": {
+		"label": "盾強化の石",
+		"kind": Kind.MATERIAL,
+		"desc": "盾に振りかけると硬さが増す石。",
+		"enhance_target": "shield",
 	},
 }
 
@@ -133,13 +149,30 @@ static func stats_for(item_type_key: String) -> Dictionary:
 static func stat_for(item_type_key: String, stat_name: String) -> int:
 	return int(stats_for(item_type_key).get(stat_name, 0))
 
+# 強化素材（Kind.MATERIAL）の対象スロット名を返す。
+# 強化素材以外、または enhance_target 未設定は空文字。
+# docs/system/equipment.md §6.1.1。
+static func enhance_target_for(item_type_key: String) -> String:
+	var def = DEFS.get(item_type_key, null)
+	if def == null:
+		return ""
+	return String(def.get("enhance_target", ""))
+
+# 装備品が「主 stat」を持つか（強化対象になり得るか）。stats が空 or 全 0 なら false。
+# お守りなど stats={} の装備は false（強化不可）。docs/system/equipment.md §6.1.1。
+static func has_primary_stat(item_type_key: String) -> bool:
+	for v in stats_for(item_type_key).values():
+		if int(v) != 0:
+			return true
+	return false
+
 # kind 単位でのスタッキング可否判定。
 # docs/system/inventory.md §2 のルールに対応：
-#   FOOD / THROW / MISC → スタック可
+#   FOOD / THROW / MISC / MATERIAL → スタック可
 #   WEAPON / SHIELD / ACCESSORY → 個別管理（+N 保持のため）
 static func is_stackable_kind(kind: int) -> bool:
 	match kind:
-		Kind.FOOD, Kind.THROW, Kind.MISC:
+		Kind.FOOD, Kind.THROW, Kind.MISC, Kind.MATERIAL:
 			return true
 		Kind.WEAPON, Kind.SHIELD, Kind.ACCESSORY:
 			return false
