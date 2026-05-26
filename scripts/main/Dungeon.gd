@@ -169,6 +169,9 @@ func _generate_new_floor() -> void:
 		var enemy = enemy_scene.instantiate()
 		add_child(enemy)
 		enemy.floor_layer = floor_layer
+		# 敵 AI が「同じ部屋」を判定できるよう、生成済みの部屋リストを注入する。
+		# scripts/enemy/Enemy.gd の _is_in_same_room() で参照される。
+		enemy.rooms = generator.rooms_list
 		new_enemies.append(enemy)
 
 	# アイテム生成
