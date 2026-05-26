@@ -119,10 +119,17 @@ func get_grid_pos(pos: Vector2) -> Vector2i:
 # 指定した方向へ移動可能かチェック
 func can_move(direction: Vector2) -> bool:
 	var current_grid_pos = get_grid_pos(position)
-	var target_grid_pos = current_grid_pos + Vector2i(direction)
+	var dir_i: Vector2i = Vector2i(direction)
+	var target_grid_pos: Vector2i = current_grid_pos + dir_i
 
 	# Floorレイヤーにタイル（床）があるか確認
 	if floor_layer and floor_layer.get_cell_source_id(target_grid_pos) == -1:
+		return false
+
+	# 斜め移動の通り抜け防止（シレン系慣習）。Combat.can_pass_diagonally に集約。
+	# 右下 (1, 1) に進む時、真右 (1, 0) と真下 (0, 1) のどちらかが壁なら通れない。
+	# docs/system/combat.md §3.1。
+	if not Combat.can_pass_diagonally(floor_layer, current_grid_pos, dir_i):
 		return false
 
 	# プレイヤーがいる場所には移動しない
@@ -211,10 +218,14 @@ func _act_chaser(player) -> void:
 	# 部屋への入退室を検知して _entry_dir を維持する（来た方向の出口を避けるため）
 	_update_entry_dir(my_grid_pos)
 
-	# 隣接（8 方向）なら攻撃
+	# 隣接（8 方向）なら攻撃。ただし斜め攻撃は壁の角を抜けられない
+	# （Combat.can_pass_diagonally で判定。docs/system/combat.md §3.1 / §5）。
+	# 壁で阻まれた場合は攻撃せず、視界 / 巡回ロジックに流して別経路から接近させる。
 	if abs(diff.x) <= 1 and abs(diff.y) <= 1 and diff != Vector2i.ZERO:
-		attack_player(player, Vector2(diff).sign())
-		return
+		var attack_dir: Vector2i = Vector2i(sign(diff.x), sign(diff.y))
+		if Combat.can_pass_diagonally(floor_layer, my_grid_pos, attack_dir):
+			attack_player(player, Vector2(attack_dir))
+			return
 
 	if _is_player_visible(my_grid_pos, player_grid_pos):
 		_has_seen_player = true

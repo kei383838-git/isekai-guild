@@ -24,3 +24,22 @@ func compute_damage(attacker_atk: int, defender_def: int) -> int:
 	var base: float = float(attacker_atk) * pow(35.0 / 36.0, float(defender_def))
 	var rng_mul: float = randf_range(7.0 / 8.0, 9.0 / 8.0)
 	return max(1, int(round(base * rng_mul)))
+
+# 斜め方向の通り抜け／攻撃が壁の角で阻まれるかを判定する。
+# from から dir (= 斜め方向 (±1, ±1)) に進む／攻撃する時、横と縦の隣接マスの
+# 両方が床である必要がある。片方でも壁なら false を返す。
+# 直線方向 (dir.x == 0 or dir.y == 0) と floor_layer が無い場面では常に true。
+# 移動 (Player.can_move / Enemy.can_move) と通常攻撃 (Player.attack /
+# Enemy._act_chaser の隣接攻撃) で共通利用する。docs/system/combat.md §3.1 / §5。
+func can_pass_diagonally(floor_layer: TileMapLayer, from: Vector2i, dir: Vector2i) -> bool:
+	if floor_layer == null:
+		return true
+	if dir.x == 0 or dir.y == 0:
+		return true
+	var horizontal: Vector2i = from + Vector2i(dir.x, 0)
+	var vertical: Vector2i = from + Vector2i(0, dir.y)
+	if floor_layer.get_cell_source_id(horizontal) == -1:
+		return false
+	if floor_layer.get_cell_source_id(vertical) == -1:
+		return false
+	return true

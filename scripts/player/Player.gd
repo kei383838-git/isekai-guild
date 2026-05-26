@@ -298,6 +298,8 @@ func _find_enemy_at_tile(tile: Vector2i):
 	return null
 
 # 通常攻撃。向き先 1 マスを攻撃する。空振りでもターンは消費する。
+# 斜め攻撃は斜め移動と同じく「壁の角を抜ける」攻撃を禁止する。
+# docs/system/combat.md §3.1 / §5。
 func attack() -> void:
 	var dir := _facing_to_vector()
 	var target_tile := tile_pos + dir
@@ -307,6 +309,11 @@ func attack() -> void:
 	_step = (_step + 1) % 2
 	sprite.frame_coords = Vector2i(_step * 2, facing)
 	get_tree().create_timer(0.3).timeout.connect(_show_idle, CONNECT_ONE_SHOT)
+
+	# 斜め攻撃は壁の角を抜けられない。両側のどちらかが壁なら空振り
+	# （モーションは出るがダメージは入らない。ターン消費は呼び元で行う）。
+	if not Combat.can_pass_diagonally(floor_layer, tile_pos, dir):
+		return
 
 	if target and target.has_method("receive_attack"):
 		target.receive_attack(effective_attack())
@@ -474,6 +481,11 @@ func can_move(target: Vector2i) -> bool:
 		return true
 	# 床がない（壁・空セル）には進めない
 	if floor_layer.get_cell_source_id(target) == -1:
+		return false
+	# 斜め移動の通り抜け防止（シレン系慣習）。Combat.can_pass_diagonally に集約。
+	# 移動先のマス自体が床でも、横方向と縦方向の片方が壁なら「壁の角を斜めに抜ける」
+	# 動きとみなして禁止。docs/system/combat.md §3.1。
+	if not Combat.can_pass_diagonally(floor_layer, tile_pos, target - tile_pos):
 		return false
 	# 敵がいるマスには進めない（攻撃は Space で別途）
 	for enemy in get_tree().get_nodes_in_group("enemies"):
