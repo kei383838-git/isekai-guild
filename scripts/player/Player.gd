@@ -499,11 +499,17 @@ func can_move(target: Vector2i) -> bool:
 func _dash(direction: Vector2i) -> void:
 	_is_dashing = true
 	for _i in DASH_MAX_STEPS:
+		# シーン切替・死亡帰還などで途中で free されると get_tree() が null になる。
+		# await 前後でツリー所属を確認してから次へ進む。
+		if not is_inside_tree():
+			break
 		if not can_move(tile_pos + direction):
 			break
 		move(direction)
 		TurnManager.advance_turn()
 		await get_tree().create_timer(0.08).timeout
+		if not is_inside_tree():
+			return
 	_is_dashing = false
 
 func _get_normal_direction(event: InputEvent) -> Vector2i:
