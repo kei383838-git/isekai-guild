@@ -3,14 +3,11 @@ class_name DungeonGenerator
 
 # 既定値（DungeonConfig が渡されない場合のフォールバック）
 const DEFAULT_MAP_SIZE = Vector2i(20, 20)
-const DEFAULT_ROOM_COUNT_MIN = 6
-const DEFAULT_ROOM_COUNT_MAX = 8
-const DEFAULT_ROOM_SIZE_MIN = 3
-const DEFAULT_ROOM_SIZE_MAX = 5
+const DEFAULT_ROOM_SIZE_MIN = 4
+const DEFAULT_ROOM_SIZE_MAX = 7
 
 const TILE_SIZE = 64
 
-# 既定のタイル ID（cfg 未指定時のフォールバック。旧 main.tscn の TileSet と一致）
 const DEFAULT_SOURCE_WALL = 0
 const DEFAULT_SOURCE_FLOOR = 1
 const ATLAS_POS_FALLBACK = Vector2i(0, 0)
@@ -38,105 +35,206 @@ const WALL_FILL_ATLAS_COORDS = [
 	WALL_FILL_D,
 ]
 
+# 区域分割の目標サイズ。map_size から cols/rows を自動算出する（例: 30x24 → 3x2 区域）。
+# 数値は「シレン風の見やすさ」優先（小さすぎると部屋が入らず、大きすぎるとマップが
+# スカスカになる）。
+const TARGET_SECTION_SIZE = 10
+
 var floor_layer: TileMapLayer
 var wall_layer: TileMapLayer
 var rooms_list: Array[Rect2i] = []
 
-# generate() の中で確定し、_create_corridor 等のヘルパからも参照する。
 var _src_floor: int = DEFAULT_SOURCE_FLOOR
 var _src_wall: int = DEFAULT_SOURCE_WALL
 var _floor_atlas_coords: Array[Vector2i] = []
 var _wall_atlas_coords: Array[Vector2i] = []
 
+# シレン式の区域分割によるマップ生成。
+# 1. マップを cols × rows の区域に均等分割
+# 2. 各区域に 1 部屋ずつ配置（マージン込み）
+# 3. 隣接区域同士を MST + 余剰 1 エッジで接続
+# 4. 接続ごとに Z 字（水平→垂直→水平 / 垂直→水平→垂直）の通路を引く
 func generate(f_layer: TileMapLayer, w_layer: TileMapLayer, cfg: DungeonConfig = null) -> Array:
 	floor_layer = f_layer
 	wall_layer = w_layer
 	rooms_list = []
 
 	var map_size: Vector2i = cfg.map_size if cfg else DEFAULT_MAP_SIZE
-	var room_count_min: int = cfg.room_count_min if cfg else DEFAULT_ROOM_COUNT_MIN
-	var room_count_max: int = cfg.room_count_max if cfg else DEFAULT_ROOM_COUNT_MAX
 	var room_size_min: int = cfg.room_size_min if cfg else DEFAULT_ROOM_SIZE_MIN
 	var room_size_max: int = cfg.room_size_max if cfg else DEFAULT_ROOM_SIZE_MAX
 	_src_floor = cfg.floor_source_id if cfg else DEFAULT_SOURCE_FLOOR
 	_src_wall = cfg.wall_source_id if cfg else DEFAULT_SOURCE_WALL
 
-	# TileSet 内のアトラス座標を集めておく。1 タイルしか無い仮置き TileSet なら 1 通り、
-	# 4x4 の本素材なら 16 通り。set_cell ごとにこの配列からランダムに 1 つ選ぶ。
 	_floor_atlas_coords = _collect_atlas_coords(floor_layer, _src_floor)
 	_wall_atlas_coords = _collect_atlas_coords(wall_layer, _src_wall)
 
 	floor_layer.clear()
 	wall_layer.clear()
 
-	var floor_cells = []
+	var floor_cells: Array = []
+	var room_cells: Dictionary = {}
 
-	# 1. 部屋の生成 (目標数に達するまで試行)
-	var target_room_count = randi_range(room_count_min, room_count_max)
-	for i in range(target_room_count * 5):
-		if rooms_list.size() >= target_room_count: break
+	# 1. 区域分割（最低 2x2、目安 10 マス角ごと）
+	var cols: int = max(2, int(map_size.x / float(TARGET_SECTION_SIZE)))
+	var rows: int = max(2, int(map_size.y / float(TARGET_SECTION_SIZE)))
+	var section_w: int = int(map_size.x / float(cols))
+	var section_h: int = int(map_size.y / float(rows))
 
-		var w = randi_range(room_size_min, room_size_max)
-		var h = randi_range(room_size_min, room_size_max)
-		var x = randi_range(1, map_size.x - w - 1)
-		var y = randi_range(1, map_size.y - h - 1)
-		
-		var new_room = Rect2i(x, y, w, h)
-		
-		# 重なり判定
-		var overlaps = false
-		for r in rooms_list:
-			if new_room.grow(1).intersects(r):
-				overlaps = true
-				break
-		
-		if overlaps: continue
-		
-		rooms_list.append(new_room)
-		
-		# 部屋を描画
-		for rx in range(new_room.position.x, new_room.end.x):
-			for ry in range(new_room.position.y, new_room.end.y):
-				var pos = Vector2i(rx, ry)
-				floor_layer.set_cell(pos, _src_floor, _random_floor_atlas())
-				wall_layer.erase_cell(pos)  # 床の上に壁を残さない
-				if not floor_cells.has(pos):
-					floor_cells.append(pos)
-		
-		# 既存のランダムな部屋と接続
-		if rooms_list.size() > 1:
-			var random_room = rooms_list[randi() % (rooms_list.size() - 1)]
-			_create_corridor(_get_center(random_room), _get_center(new_room), floor_cells)
-			
-			if randf() < 0.4 and rooms_list.size() > 2:
-				var another_room = rooms_list[randi() % (rooms_list.size() - 1)]
-				if another_room != random_room:
-					_create_corridor(_get_center(another_room), _get_center(new_room), floor_cells)
-			
-	# 2. 床セルとの隣接関係を見て、方向つき壁タイルを配置する。
+	# 2. 各区域に 1 部屋を配置
+	# rooms_by_idx[r * cols + c] = Rect2i（接続ロジックで区域インデックス → 部屋を引く）
+	var rooms_by_idx: Array = []
+	for ri in range(rows):
+		for ci in range(cols):
+			var sx: int = ci * section_w
+			var sy: int = ri * section_h
+			# 区域内マージン：上下左右に 1 マスは確保（壁を残す）
+			# 加えて通路を引くマージンとしてもう 1 マスずつ取る
+			var max_w: int = min(room_size_max, section_w - 4)
+			var max_h: int = min(room_size_max, section_h - 4)
+			var w: int = randi_range(room_size_min, max(room_size_min, max_w))
+			var h: int = randi_range(room_size_min, max(room_size_min, max_h))
+			var x: int = sx + randi_range(2, max(2, section_w - w - 2))
+			var y: int = sy + randi_range(2, max(2, section_h - h - 2))
+			var rect = Rect2i(x, y, w, h)
+			rooms_list.append(rect)
+			rooms_by_idx.append(rect)
+			# 部屋を描画
+			for rx in range(rect.position.x, rect.end.x):
+				for ry in range(rect.position.y, rect.end.y):
+					var pos = Vector2i(rx, ry)
+					floor_layer.set_cell(pos, _src_floor, _random_floor_atlas())
+					wall_layer.erase_cell(pos)
+					room_cells[pos] = true
+					if not floor_cells.has(pos):
+						floor_cells.append(pos)
+
+	# 3. 区域接続グラフ：MST + 余剰 1 エッジ
+	var connections: Array = _build_section_connections(cols, rows)
+
+	# 4. 接続ごとに通路を引く
+	for conn in connections:
+		var idx_a: int = conn[0]
+		var idx_b: int = conn[1]
+		var room_a: Rect2i = rooms_by_idx[idx_a]
+		var room_b: Rect2i = rooms_by_idx[idx_b]
+		# 区域インデックスの差で水平/垂直を判別
+		if idx_b - idx_a == 1:
+			_draw_h_corridor(room_a, room_b, room_cells, floor_cells)
+		else:
+			_draw_v_corridor(room_a, room_b, room_cells, floor_cells)
+
+	# 5. 床セルに対する壁タイル配置
 	_paint_walls(map_size, floor_cells)
 
 	return floor_cells
 
-func _get_center(rect: Rect2i) -> Vector2i:
-	return Vector2i(rect.position.x + int(rect.size.x / 2.0), rect.position.y + int(rect.size.y / 2.0))
+# 区域グラフから MST + 余剰 1 エッジを構築する。
+# 各エッジは [idx_a, idx_b]、idx_a < idx_b、idx = r * cols + c。
+# 水平エッジは idx_b - idx_a == 1、垂直エッジは idx_b - idx_a == cols。
+func _build_section_connections(cols: int, rows: int) -> Array:
+	var edges: Array = []
+	for ri in range(rows):
+		for ci in range(cols):
+			var idx = ri * cols + ci
+			if ci + 1 < cols:
+				edges.append([idx, idx + 1])
+			if ri + 1 < rows:
+				edges.append([idx, idx + cols])
+	edges.shuffle()
 
-func _create_corridor(start: Vector2i, end: Vector2i, floor_cells: Array):
-	var x_start = min(start.x, end.x)
-	var x_end = max(start.x, end.x)
-	for x in range(x_start, x_end + 1):
-		var pos = Vector2i(x, start.y)
-		floor_layer.set_cell(pos, _src_floor, _random_floor_atlas())
-		wall_layer.erase_cell(pos)
-		if not floor_cells.has(pos): floor_cells.append(pos)
+	# Union-Find で MST
+	var parent: Array = []
+	for i in range(cols * rows):
+		parent.append(i)
 
-	var y_start = min(start.y, end.y)
-	var y_end = max(start.y, end.y)
-	for y in range(y_start, y_end + 1):
-		var pos = Vector2i(end.x, y)
-		floor_layer.set_cell(pos, _src_floor, _random_floor_atlas())
-		wall_layer.erase_cell(pos)
-		if not floor_cells.has(pos): floor_cells.append(pos)
+	var mst: Array = []
+	for e in edges:
+		var ra = _uf_find(parent, e[0])
+		var rb = _uf_find(parent, e[1])
+		if ra != rb:
+			parent[ra] = rb
+			mst.append(e)
+
+	# 余剰 1 エッジ（任意でループを作って単調さを和らげる）
+	var extras: Array = []
+	for e in edges:
+		var in_mst = false
+		for me in mst:
+			if me[0] == e[0] and me[1] == e[1]:
+				in_mst = true
+				break
+		if not in_mst:
+			extras.append(e)
+	if not extras.is_empty():
+		mst.append(extras[randi() % extras.size()])
+
+	return mst
+
+func _uf_find(parent: Array, x: int) -> int:
+	while parent[x] != x:
+		parent[x] = parent[parent[x]]
+		x = parent[x]
+	return x
+
+# 水平接続：左部屋 a と右部屋 b を Z 字（水平→垂直→水平）で結ぶ。
+# 中継 x（mid_x）を 2 部屋の間でランダムに選び、部屋 a の右辺〜mid_x を y_a で、
+# mid_x で縦に折れて y_b に合わせ、mid_x〜部屋 b の左辺を y_b で水平に引く。
+func _draw_h_corridor(a_in: Rect2i, b_in: Rect2i, room_cells: Dictionary, floor_cells: Array) -> void:
+	var a: Rect2i = a_in
+	var b: Rect2i = b_in
+	if a.position.x > b.position.x:
+		var tmp = a
+		a = b
+		b = tmp
+	var y_a = randi_range(a.position.y, a.end.y - 1)
+	var y_b = randi_range(b.position.y, b.end.y - 1)
+	var mid_lo: int = a.end.x
+	var mid_hi: int = b.position.x - 1
+	var mid_x: int = mid_lo if mid_lo >= mid_hi else randi_range(mid_lo, mid_hi)
+
+	# 水平 1：a の右壁 → mid_x
+	for x in range(a.end.x, mid_x + 1):
+		_set_corridor(Vector2i(x, y_a), room_cells, floor_cells)
+	# 垂直：mid_x で y_a..y_b
+	var y_lo = min(y_a, y_b)
+	var y_hi = max(y_a, y_b)
+	for y in range(y_lo, y_hi + 1):
+		_set_corridor(Vector2i(mid_x, y), room_cells, floor_cells)
+	# 水平 2：mid_x → b の左壁
+	for x in range(mid_x, b.position.x):
+		_set_corridor(Vector2i(x, y_b), room_cells, floor_cells)
+
+# 垂直接続：上部屋 a と下部屋 b を Z 字（垂直→水平→垂直）で結ぶ。
+func _draw_v_corridor(a_in: Rect2i, b_in: Rect2i, room_cells: Dictionary, floor_cells: Array) -> void:
+	var a: Rect2i = a_in
+	var b: Rect2i = b_in
+	if a.position.y > b.position.y:
+		var tmp = a
+		a = b
+		b = tmp
+	var x_a = randi_range(a.position.x, a.end.x - 1)
+	var x_b = randi_range(b.position.x, b.end.x - 1)
+	var mid_lo: int = a.end.y
+	var mid_hi: int = b.position.y - 1
+	var mid_y: int = mid_lo if mid_lo >= mid_hi else randi_range(mid_lo, mid_hi)
+
+	for y in range(a.end.y, mid_y + 1):
+		_set_corridor(Vector2i(x_a, y), room_cells, floor_cells)
+	var x_lo = min(x_a, x_b)
+	var x_hi = max(x_a, x_b)
+	for x in range(x_lo, x_hi + 1):
+		_set_corridor(Vector2i(x, mid_y), room_cells, floor_cells)
+	for y in range(mid_y, b.position.y):
+		_set_corridor(Vector2i(x_b, y), room_cells, floor_cells)
+
+# 通路 1 セルを描画。部屋セルなら触らない（重複 set_cell も避ける）。
+func _set_corridor(pos: Vector2i, room_cells: Dictionary, floor_cells: Array) -> void:
+	if room_cells.has(pos):
+		return
+	floor_layer.set_cell(pos, _src_floor, _random_floor_atlas())
+	wall_layer.erase_cell(pos)
+	if not floor_cells.has(pos):
+		floor_cells.append(pos)
 
 func _paint_walls(map_size: Vector2i, floor_cells: Array) -> void:
 	var floor_lookup := {}
@@ -157,8 +255,6 @@ func _wall_atlas_for(pos: Vector2i, floor_lookup: Dictionary) -> Vector2i:
 	var left := _is_floor_cell(floor_lookup, pos + Vector2i(-1, 0))
 	var right := _is_floor_cell(floor_lookup, pos + Vector2i(1, 0))
 
-	# 部屋や通路の斜め角を囲う壁セル。角タイルは L 字なので、直交方向に
-	# 床が隣接しているセルではなく、斜めにだけ床があるセルへ使う。
 	if not up and not down and not left and not right:
 		if _is_floor_cell(floor_lookup, pos + Vector2i(1, 1)):
 			return _wall_atlas_or_random(WALL_TOP_LEFT)
@@ -200,7 +296,6 @@ func _wall_atlas_or_random(coords: Vector2i) -> Vector2i:
 		return coords
 	return _random_wall_atlas()
 
-# TileSet のソースに登録されている全アトラス座標を集める。
 func _collect_atlas_coords(layer: TileMapLayer, source_id: int) -> Array[Vector2i]:
 	var coords: Array[Vector2i] = []
 	if layer == null or layer.tile_set == null:
@@ -225,20 +320,20 @@ func _random_wall_atlas() -> Vector2i:
 
 func place_entities(player: Node2D, enemies: Array, _floor_cells: Array):
 	if rooms_list.is_empty(): return
-	
+
 	var shuffled_rooms = rooms_list.duplicate()
 	shuffled_rooms.shuffle()
-	
+
 	# プレイヤーの配置 (最初の部屋)
 	var player_room = shuffled_rooms.pop_back()
 	player.position = Vector2(_get_random_pos_in_room(player_room) * TILE_SIZE)
-	
+
 	# 敵の配置 (残りの部屋に1体ずつ)
 	for enemy in enemies:
 		if shuffled_rooms.is_empty():
 			shuffled_rooms = rooms_list.duplicate()
 			shuffled_rooms.shuffle()
-			
+
 		var enemy_room = shuffled_rooms.pop_back()
 		enemy.position = Vector2(_get_random_pos_in_room(enemy_room) * TILE_SIZE)
 
@@ -251,12 +346,15 @@ func _get_random_pos_in_room(rect: Rect2i) -> Vector2i:
 func get_stair_pos(floor_cells: Array) -> Vector2i:
 	# 階段は通路ではなく部屋の中にだけ配置する
 	if not rooms_list.is_empty():
-		var room: Rect2i = rooms_list[randi() % rooms_list.size()]
-		return Vector2i(
-			randi_range(room.position.x, room.end.x - 1),
-			randi_range(room.position.y, room.end.y - 1)
-		)
+		return _get_random_pos_in_room(rooms_list[randi() % rooms_list.size()])
 	# フォールバック: 部屋が無い異常系では床セルから拾う
 	if floor_cells.is_empty():
 		return Vector2i.ZERO
 	return floor_cells[randi() % floor_cells.size()]
+
+# 床落ちアイテムなど「部屋の中にだけ置きたい」要素の配置に使う。
+# シレン系の慣習に揃え、通路上には落ちない。
+func get_random_room_cell() -> Vector2i:
+	if rooms_list.is_empty():
+		return Vector2i.ZERO
+	return _get_random_pos_in_room(rooms_list[randi() % rooms_list.size()])

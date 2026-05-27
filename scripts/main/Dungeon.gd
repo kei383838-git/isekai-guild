@@ -174,7 +174,7 @@ func _generate_new_floor() -> void:
 		enemy.rooms = generator.rooms_list
 		new_enemies.append(enemy)
 
-	# アイテム生成
+	# アイテム生成（シレン系の慣習に揃え、床落ちは部屋の中にのみ配置する）
 	var item_scene = load("res://scenes/item/Item.tscn")
 	var item_count := randi_range(config.items_per_floor_min, config.items_per_floor_max)
 	for i in range(item_count):
@@ -184,7 +184,7 @@ func _generate_new_floor() -> void:
 		item.item_type = item_type
 		item.amount = 1
 		add_child(item)
-		var pos: Vector2i = floor_cells[randi() % floor_cells.size()]
+		var pos: Vector2i = generator.get_random_room_cell()
 		item.position = Vector2(pos * TILE_SIZE)
 
 	# プレイヤー・敵の配置

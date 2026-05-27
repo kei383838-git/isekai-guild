@@ -10,11 +10,12 @@ id = "forest_beginner"
 display_name = "初心者の森"
 description = "村のすぐ近くにある、新人冒険者向けの森。
 薬草が自生し、スライムなどの弱い魔物が出没する。"
+map_size = Vector2i(30, 24)
 floor_count = 3
-room_count_min = 5
-room_count_max = 7
-room_size_min = 3
-room_size_max = 5
+room_count_min = 6
+room_count_max = 6
+room_size_min = 4
+room_size_max = 7
 enemies_per_floor = 2
 item_types = Array[String](["herb", "wooden_sword", "wooden_shield", "talisman", "throw_stone"])
 items_per_floor_min = 2
