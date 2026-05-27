@@ -3,6 +3,8 @@ class_name DungeonGenerator
 
 # 既定値（DungeonConfig が渡されない場合のフォールバック）
 const DEFAULT_MAP_SIZE = Vector2i(20, 20)
+const DEFAULT_ROOM_COUNT_MIN = 4
+const DEFAULT_ROOM_COUNT_MAX = 6
 const DEFAULT_ROOM_SIZE_MIN = 4
 const DEFAULT_ROOM_SIZE_MAX = 7
 
@@ -60,6 +62,8 @@ func generate(f_layer: TileMapLayer, w_layer: TileMapLayer, cfg: DungeonConfig =
 	rooms_list = []
 
 	var map_size: Vector2i = cfg.map_size if cfg else DEFAULT_MAP_SIZE
+	var room_count_min: int = cfg.room_count_min if cfg else DEFAULT_ROOM_COUNT_MIN
+	var room_count_max: int = cfg.room_count_max if cfg else DEFAULT_ROOM_COUNT_MAX
 	var room_size_min: int = cfg.room_size_min if cfg else DEFAULT_ROOM_SIZE_MIN
 	var room_size_max: int = cfg.room_size_max if cfg else DEFAULT_ROOM_SIZE_MAX
 	_src_floor = cfg.floor_source_id if cfg else DEFAULT_SOURCE_FLOOR
@@ -80,33 +84,63 @@ func generate(f_layer: TileMapLayer, w_layer: TileMapLayer, cfg: DungeonConfig =
 	var section_w: int = int(map_size.x / float(cols))
 	var section_h: int = int(map_size.y / float(rows))
 
-	# 2. 各区域に 1 部屋を配置
-	# rooms_by_idx[r * cols + c] = Rect2i（接続ロジックで区域インデックス → 部屋を引く）
+	# 2. 各区域に「部屋」または「中継点」を配置
+	# room_count_min/max を区域数 (cols*rows) で clamp し、その範囲で部屋数をランダム決定。
+	# 残りの区域は 1 マスだけ床にした「中継点」（通路扱い）にする。
+	# rooms_by_idx[idx] には部屋でも中継点でも Rect2i が入り、接続ロジックが共通で扱える。
+	# 一方 rooms_list には**部屋のみ**入れる（敵/プレイヤー/アイテム/階段の配置対象）。
 	var rooms_by_idx: Array = []
+	var section_count: int = cols * rows
+	var rm_min: int = clampi(room_count_min, 1, section_count)
+	var rm_max: int = clampi(room_count_max, rm_min, section_count)
+	var target_rooms: int = randi_range(rm_min, rm_max)
+
+	var section_indices: Array = []
+	for i in range(section_count):
+		section_indices.append(i)
+	section_indices.shuffle()
+	var has_room: Array = []
+	for i in range(section_count):
+		has_room.append(false)
+	for i in range(target_rooms):
+		has_room[section_indices[i]] = true
+
 	for ri in range(rows):
 		for ci in range(cols):
+			var idx: int = ri * cols + ci
 			var sx: int = ci * section_w
 			var sy: int = ri * section_h
-			# 区域内マージン：上下左右に 1 マスは確保（壁を残す）
-			# 加えて通路を引くマージンとしてもう 1 マスずつ取る
-			var max_w: int = min(room_size_max, section_w - 4)
-			var max_h: int = min(room_size_max, section_h - 4)
-			var w: int = randi_range(room_size_min, max(room_size_min, max_w))
-			var h: int = randi_range(room_size_min, max(room_size_min, max_h))
-			var x: int = sx + randi_range(2, max(2, section_w - w - 2))
-			var y: int = sy + randi_range(2, max(2, section_h - h - 2))
-			var rect = Rect2i(x, y, w, h)
-			rooms_list.append(rect)
-			rooms_by_idx.append(rect)
-			# 部屋を描画
-			for rx in range(rect.position.x, rect.end.x):
-				for ry in range(rect.position.y, rect.end.y):
-					var pos = Vector2i(rx, ry)
-					floor_layer.set_cell(pos, _src_floor, _random_floor_atlas())
-					wall_layer.erase_cell(pos)
-					room_cells[pos] = true
-					if not floor_cells.has(pos):
-						floor_cells.append(pos)
+			if has_room[idx]:
+				# 部屋：区域内マージン込みで矩形を取り、床として描画
+				var max_w: int = min(room_size_max, section_w - 4)
+				var max_h: int = min(room_size_max, section_h - 4)
+				var w: int = randi_range(room_size_min, max(room_size_min, max_w))
+				var h: int = randi_range(room_size_min, max(room_size_min, max_h))
+				var x: int = sx + randi_range(2, max(2, section_w - w - 2))
+				var y: int = sy + randi_range(2, max(2, section_h - h - 2))
+				var rect = Rect2i(x, y, w, h)
+				rooms_list.append(rect)
+				rooms_by_idx.append(rect)
+				for rx in range(rect.position.x, rect.end.x):
+					for ry in range(rect.position.y, rect.end.y):
+						var pos = Vector2i(rx, ry)
+						floor_layer.set_cell(pos, _src_floor, _random_floor_atlas())
+						wall_layer.erase_cell(pos)
+						room_cells[pos] = true
+						if not floor_cells.has(pos):
+							floor_cells.append(pos)
+			else:
+				# 中継点：区域中央付近の 1 マスを通路として描画。
+				# rooms_list には入れない（部屋ではない＝敵/アイテム/階段の配置先にしない）。
+				var wp_x: int = sx + int(section_w / 2.0)
+				var wp_y: int = sy + int(section_h / 2.0)
+				var wp_pos = Vector2i(wp_x, wp_y)
+				floor_layer.set_cell(wp_pos, _src_floor, _random_floor_atlas())
+				wall_layer.erase_cell(wp_pos)
+				# room_cells には入れない（通路扱い）
+				if not floor_cells.has(wp_pos):
+					floor_cells.append(wp_pos)
+				rooms_by_idx.append(Rect2i(wp_x, wp_y, 1, 1))
 
 	# 3. 区域接続グラフ：MST + 余剰 1 エッジ
 	var connections: Array = _build_section_connections(cols, rows)
