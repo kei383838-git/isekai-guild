@@ -21,6 +21,13 @@ const FALLBACK_CONFIG_PATH = "res://data/dungeons/forest_beginner.tres"
 @onready var _stair_btn_suspend: Button = $StairPrompt/Panel/Margin/VBox/Buttons/SuspendButton
 @onready var _stair_btn_cancel: Button  = $StairPrompt/Panel/Margin/VBox/Buttons/CancelButton
 
+# 足元アイテム上でのプロンプト（拾う / 投げる / そのまま）
+@onready var _foot_prompt: CanvasLayer = $FootPrompt
+@onready var _foot_msg: Label    = $FootPrompt/Panel/Margin/VBox/MessageLabel
+@onready var _foot_btn_pickup: Button = $FootPrompt/Panel/Margin/VBox/Buttons/PickupButton
+@onready var _foot_btn_throw: Button  = $FootPrompt/Panel/Margin/VBox/Buttons/ThrowButton
+@onready var _foot_btn_cancel: Button = $FootPrompt/Panel/Margin/VBox/Buttons/FootCancelButton
+
 var config: DungeonConfig
 var generator := DungeonGenerator.new()
 var current_floor := 1
@@ -33,12 +40,23 @@ var _stair_prompt_open: bool = false
 # 「やめる」を選んだ後、階段マスから離れるまで再表示しないためのフラグ
 var _stair_prompt_dismissed: bool = false
 
+# 足元プロンプト状態
+var _foot_prompt_open: bool = false
+# 「そのまま」を選んだ後、足元アイテムから離れるまで再表示しないためのフラグ
+var _foot_prompt_dismissed: bool = false
+# 現在足元プロンプトの対象になっているアイテムノード
+var _foot_target_item: Node = null
+
 func _ready() -> void:
 	_register_input_actions()
 	# 階段プロンプト
 	_stair_btn_descend.pressed.connect(_on_stair_descend)
 	_stair_btn_suspend.pressed.connect(_on_stair_suspend)
 	_stair_btn_cancel.pressed.connect(_on_stair_cancel)
+	# 足元プロンプト
+	_foot_btn_pickup.pressed.connect(_on_foot_pickup)
+	_foot_btn_throw.pressed.connect(_on_foot_throw)
+	_foot_btn_cancel.pressed.connect(_on_foot_cancel)
 
 	# 中断ロード経路：SaveManager から pending_dungeon が来ていれば、
 	# 中断した階の **次の階** から開始する（中断は階段マスでの選択なので、
@@ -80,6 +98,10 @@ func _ready() -> void:
 	TurnManager.enemy_turn_started.connect(_on_player_action_finished)
 	if player.has_signal("died"):
 		player.died.connect(_on_player_died)
+	# ダッシュがアイテム上で終わった時だけ足元プロンプトを出す
+	# （通常移動は Player.move() 内の自動拾いに任せる）
+	if player.has_signal("dash_ended_on_item"):
+		player.dash_ended_on_item.connect(_on_dash_ended_on_item)
 
 func _register_input_actions() -> void:
 	# マップ：M / ゲームパッド Back (Select)
@@ -159,6 +181,9 @@ func _generate_new_floor() -> void:
 	var floor_cells = generator.generate(floor_layer, wall_layer, config)
 
 	player.floor_layer = floor_layer
+	# ダッシュの停止判定で部屋/通路を区別するため部屋リストを渡す
+	# （階段位置はこのあと get_stair_pos で決めてから渡す）
+	player.rooms = generator.rooms_list
 
 	# 敵生成
 	var new_enemies: Array = []
@@ -198,6 +223,8 @@ func _generate_new_floor() -> void:
 	# 階段配置
 	stair_pos = generator.get_stair_pos(floor_cells)
 	stair_sprite.position = Vector2(stair_pos * TILE_SIZE)
+	# ダッシュが階段マスで止まれるよう Player にも階段位置を渡す
+	player.stair_tile = stair_pos
 	# 新フロアでは階段プロンプトを再び有効化（前フロアで「やめる」したフラグを解除）
 	_stair_prompt_dismissed = false
 
@@ -211,7 +238,7 @@ func _generate_new_floor() -> void:
 	get_tree().create_timer(0.5).timeout.connect(func(): is_transitioning = false)
 
 func _on_player_action_finished() -> void:
-	if is_transitioning or _stair_prompt_open:
+	if is_transitioning or _stair_prompt_open or _foot_prompt_open:
 		return
 	if player.tile_pos == stair_pos:
 		# 「やめる」した後は、階段から離れるまで再表示しない
@@ -220,6 +247,18 @@ func _on_player_action_finished() -> void:
 	else:
 		# 階段マスから離れたら、再び乗った時にプロンプトを出すよう dismiss を解除
 		_stair_prompt_dismissed = false
+
+# ダッシュ中にアイテムマスで停止した時に呼ばれる（Player の signal）。
+# 通常移動でアイテムに乗った時は Player.move() 内で自動拾いされるのでここには来ない。
+func _on_dash_ended_on_item(item: Node) -> void:
+	if is_transitioning or _stair_prompt_open or _foot_prompt_open:
+		return
+	if item == null or not is_instance_valid(item):
+		return
+	# 階段マスと重なっている場合は階段プロンプトを優先する
+	if player.tile_pos == stair_pos:
+		return
+	_show_foot_prompt(item)
 
 func _on_reach_stair() -> void:
 	if is_transitioning:
@@ -293,6 +332,65 @@ func _on_stair_suspend() -> void:
 func _on_stair_cancel() -> void:
 	_stair_prompt_dismissed = true
 	_close_stair_prompt()
+
+# --- 足元プロンプト ---
+
+# Player の tile_pos と同じマスにあるアイテムノードを返す（無ければ null）
+func _find_item_at_tile(pos: Vector2i) -> Node:
+	for item in get_tree().get_nodes_in_group("items"):
+		if not is_instance_valid(item):
+			continue
+		var i_tile: Vector2i = Vector2i(round(item.position.x / TILE_SIZE), round(item.position.y / TILE_SIZE))
+		if i_tile == pos:
+			return item
+	return null
+
+func _show_foot_prompt(item: Node) -> void:
+	_foot_prompt_open = true
+	_foot_target_item = item
+	var label_text: String = Item.label_for(item.item_type)
+	_foot_msg.text = "%s が落ちている。" % label_text
+	PauseMenu.set_blocked(true)
+	_foot_prompt.show()
+	_foot_btn_pickup.grab_focus()
+	get_tree().paused = true
+
+func _close_foot_prompt() -> void:
+	_foot_prompt_open = false
+	_foot_prompt.hide()
+	get_tree().paused = false
+	PauseMenu.set_blocked(false)
+
+func _on_foot_pickup() -> void:
+	if _foot_target_item != null and is_instance_valid(_foot_target_item) and player.has_method("try_pickup"):
+		# try_pickup は player の tile_pos のアイテムを拾う。
+		# 対象が同じマスにいる前提（_show_foot_prompt がそう判定して呼んだ）。
+		player.try_pickup()
+	_close_foot_prompt()
+	_foot_target_item = null
+	# 拾った直後にプレイヤーがそのまま留まる場合に再表示されないよう dismiss しておく
+	_foot_prompt_dismissed = true
+
+func _on_foot_throw() -> void:
+	var item := _foot_target_item
+	if item == null or not is_instance_valid(item) or not player.has_method("throw_item"):
+		_close_foot_prompt()
+		return
+	# 足元アイテムを一旦 PlayerData に追加して、その stack 参照を Player.throw_item に渡す。
+	# throw_item 内部で remove_stack されるため、結果として「足元から直接投げた」状態になる。
+	var key: String = item.item_type
+	var stack: Dictionary = PlayerData.add_item(key, 1)
+	item.queue_free()
+	_foot_target_item = null
+	_close_foot_prompt()
+	_foot_prompt_dismissed = true
+	if not stack.is_empty():
+		player.throw_item(stack)
+		TurnManager.advance_turn()
+
+func _on_foot_cancel() -> void:
+	_foot_prompt_dismissed = true
+	_close_foot_prompt()
 
 func _return_to_base() -> void:
 	var ret: String = config.return_scene if config.return_scene != "" \

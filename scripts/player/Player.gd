@@ -3,6 +3,10 @@ extends CharacterBody2D
 signal stats_changed(hp: int, max_hp: int, sp: int, max_sp: int)
 signal hunger_changed(hunger: int, max_hunger: int)
 signal died
+# ダッシュが終了した時点で足元にアイテムがあった場合に発火する。
+# Dungeon.gd が受けて「拾う / 投げる / そのまま」の足元プロンプトを表示する。
+# 通常移動でアイテムに乗った時は自動拾いなので、この signal は発火しない。
+signal dash_ended_on_item(item_node: Node)
 # inventory_changed は PlayerData (autoload) 側に移管
 
 const TILE_SIZE: int = 64
@@ -36,6 +40,11 @@ var tile_pos: Vector2i
 var facing: int = DIR_DOWN
 var in_village: bool = false
 var floor_layer: TileMapLayer = null
+# ダンジョン側から毎フロア注入される。ダッシュの停止判定で参照する。
+# rooms：部屋矩形のリスト（部屋内/通路の判定）
+# stair_tile：階段マス（乗ったらダッシュ停止）
+var rooms: Array[Rect2i] = []
+var stair_tile: Vector2i = Vector2i(-1, -1)
 var _step: int = 1
 var _is_dashing: bool = false
 var _is_dead: bool = false
@@ -167,13 +176,16 @@ func _update_facing(direction: Vector2i) -> void:
 		Vector2i(-1, -1): facing = DIR_LT
 		Vector2i(-1, 1):  facing = DIR_LB
 
-func move(direction: Vector2i) -> void:
+func move(direction: Vector2i, auto_pickup: bool = true) -> void:
 	_update_facing(direction)
 	_step = (_step + 1) % 2
 	sprite.frame_coords = Vector2i(_step * 2, facing)
 	tile_pos += direction
 	position = tile_to_world(tile_pos)
-	try_pickup()
+	# 通常移動は従来通り自動拾い。ダッシュからは auto_pickup=false で呼ばれ、
+	# 拾わずに止まって足元プロンプト（拾う/投げる/そのまま）を選ばせる。
+	if auto_pickup:
+		try_pickup()
 	# 満腹度 0 で移動すると 1 歩 1 HP 減（攻撃・スキル等では発生しない）
 	if not in_village and hunger == 0:
 		take_damage(1)
@@ -497,20 +509,187 @@ func can_move(target: Vector2i) -> bool:
 	return true
 
 func _dash(direction: Vector2i) -> void:
+	# 開始時に 8 方向隣接に敵がいる場合は、ダッシュを起動せず通常移動 1 歩に
+	# フォールバック（シレン本家：見えている敵の前でダッシュは始まらない）。
+	if _has_adjacent_enemy():
+		if can_move(tile_pos + direction):
+			move(direction)
+			TurnManager.advance_turn()
+		else:
+			_update_facing(direction)
+			_show_idle()
+		return
+
+	# 最初の 1 マスから進めない場合は、通常移動と同じく向きだけ更新して終了。
+	# 完全に無反応だと「動けない」ように見えるので、向きフィードバックは返す。
+	if not can_move(tile_pos + direction):
+		_update_facing(direction)
+		_show_idle()
+		return
+
 	_is_dashing = true
+	var current_dir: Vector2i = direction
+	var was_in_room: bool = _is_in_room(tile_pos)
+
 	for _i in DASH_MAX_STEPS:
-		# シーン切替・死亡帰還などで途中で free されると get_tree() が null になる。
-		# await 前後でツリー所属を確認してから次へ進む。
+		# シーン切替・死亡帰還などで途中で free されると get_tree() が null になる
 		if not is_inside_tree():
 			break
-		if not can_move(tile_pos + direction):
+
+		# 進行方向への移動可否。通路で進めないなら左右への曲がりを試す。
+		var step_dir: Vector2i = current_dir
+		if not can_move(tile_pos + step_dir):
+			if not was_in_room and _is_orthogonal(step_dir):
+				step_dir = _resolve_corridor_turn(current_dir)
+				if step_dir == Vector2i.ZERO:
+					break  # 行き止まり or 分岐
+			else:
+				break  # 部屋内で壁 / 斜めダッシュで壁
+
+		var next_pos: Vector2i = tile_pos + step_dir
+		var next_in_room: bool = _is_in_room(next_pos)
+
+		# 部屋⇄通路の境界では手前停止する（次のマスへは踏み込まない）。
+		# - 離れた位置から進んできた場合（_i > 0）：境界の手前で止まる
+		#   （通路→部屋なら部屋の前、部屋→通路なら部屋の最終マス）
+		# - 境界の隣からダッシュした場合（_i == 0）：1 マスだけ越えて停止する。
+		#   これにより「手前で止まった後、もう一度ダッシュすれば 1 歩進んで入れる」。
+		if was_in_room != next_in_room and _i > 0:
 			break
-		move(direction)
+
+		# 移動後に停止する条件を先に判定（移動はする＝アイテムは拾う / 階段に乗る）
+		var stop_after: bool = false
+		if next_pos == stair_tile:
+			stop_after = true
+		elif _item_at_tile(next_pos) != null:
+			stop_after = true
+		elif was_in_room != next_in_room and _i == 0:
+			stop_after = true  # 初回のみ：境界をまたいで 1 マスだけ進んで停止
+
+		# ダッシュ中はアイテム自動拾いをスキップ（足元プロンプトで選ばせるため）
+		move(step_dir, false)
+		current_dir = step_dir
+		was_in_room = next_in_room
 		TurnManager.advance_turn()
+
+		if stop_after:
+			break
+		# 移動後に敵が隣接したら停止（敵が近づいてきたケース含む）
+		if _has_adjacent_enemy():
+			break
+		# 通路を進んでいて、移動先が分岐点（T 字 / 十字）なら停止。
+		# 移動後の判定なので、最初の 1 歩で分岐点に到達した場合も止まる（0 マス停止にはならない）。
+		if not was_in_room and _corridor_exit_count(tile_pos) >= 3:
+			break
+		# 部屋内を進んでいて、横（4 方向）に通路の出口があるマスに到達したら停止。
+		# 部屋の中で出口を素通りして端まで行ってしまうのを防ぐ。
+		# こちらも移動後判定なので、最初の 1 歩で出口の横に到達した場合も止まる。
+		if was_in_room and _has_adjacent_corridor(tile_pos):
+			break
+
+		# move() / advance_turn() の中で死亡帰還やシーン切替が起きると
+		# ここで get_tree() が null になり得るので、await 前にもう一度確認。
+		if not is_inside_tree():
+			return
 		await get_tree().create_timer(0.08).timeout
 		if not is_inside_tree():
 			return
+
 	_is_dashing = false
+	# ダッシュ終了時の足元にアイテムが残っていればプロンプト表示を要求する
+	# （Dungeon.gd の _on_dash_ended_on_item が受ける）
+	if is_inside_tree():
+		var foot_item: Node = _item_at_tile(tile_pos)
+		if foot_item != null:
+			dash_ended_on_item.emit(foot_item)
+
+# ダッシュ中、tile_pos が部屋矩形のどれかに含まれるか
+func _is_in_room(pos: Vector2i) -> bool:
+	for r in rooms:
+		if r.has_point(pos):
+			return true
+	return false
+
+# 8 方向隣接（自マス除く）に敵がいるか
+func _has_adjacent_enemy() -> bool:
+	if not is_inside_tree():
+		return false
+	for e in get_tree().get_nodes_in_group("enemies"):
+		if not is_instance_valid(e):
+			continue
+		var e_tile: Vector2i = Vector2i(round(e.position.x / TILE_SIZE), round(e.position.y / TILE_SIZE))
+		var d: Vector2i = e_tile - tile_pos
+		if d == Vector2i.ZERO:
+			continue
+		if abs(d.x) <= 1 and abs(d.y) <= 1:
+			return true
+	return false
+
+# 指定タイルにあるアイテムノードを返す（無ければ null）
+func _item_at_tile(pos: Vector2i) -> Node:
+	if not is_inside_tree():
+		return null
+	for item in get_tree().get_nodes_in_group("items"):
+		if not is_instance_valid(item):
+			continue
+		var i_tile: Vector2i = Vector2i(round(item.position.x / TILE_SIZE), round(item.position.y / TILE_SIZE))
+		if i_tile == pos:
+			return item
+	return null
+
+# 直交 4 方向か（斜めではないか）
+func _is_orthogonal(dir: Vector2i) -> bool:
+	return (dir.x == 0) != (dir.y == 0)
+
+# 指定マスから上下左右の 4 方向のうち通れる方向の数を数える。
+# ダッシュの分岐判定（3 以上で分岐点）に使う。
+func _corridor_exit_count(pos: Vector2i) -> int:
+	if floor_layer == null:
+		return 0
+	var count: int = 0
+	for d in [Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]:
+		if floor_layer.get_cell_source_id(pos + d) != -1:
+			count += 1
+	return count
+
+# 指定マス（部屋内想定）の上下左右に「通路（部屋外の床）」が隣接しているか。
+# 部屋内ダッシュ中に通路の出口の横で止まるための判定。
+func _has_adjacent_corridor(pos: Vector2i) -> bool:
+	if floor_layer == null:
+		return false
+	for d in [Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]:
+		var n: Vector2i = pos + d
+		if floor_layer.get_cell_source_id(n) != -1 and not _is_in_room(n):
+			return true
+	return false
+
+# 通路で進行方向が壁の時、左右どちらか 1 方向のみが通れるならその方向を返す。
+# 両方通れる（分岐）or 両方壁（行き止まり）なら Vector2i.ZERO（停止）。
+func _resolve_corridor_turn(current_dir: Vector2i) -> Vector2i:
+	var left_dir: Vector2i
+	var right_dir: Vector2i
+	if current_dir == Vector2i.UP:
+		left_dir = Vector2i.LEFT
+		right_dir = Vector2i.RIGHT
+	elif current_dir == Vector2i.DOWN:
+		left_dir = Vector2i.RIGHT
+		right_dir = Vector2i.LEFT
+	elif current_dir == Vector2i.LEFT:
+		left_dir = Vector2i.DOWN
+		right_dir = Vector2i.UP
+	elif current_dir == Vector2i.RIGHT:
+		left_dir = Vector2i.UP
+		right_dir = Vector2i.DOWN
+	else:
+		return Vector2i.ZERO
+
+	var left_ok: bool = can_move(tile_pos + left_dir)
+	var right_ok: bool = can_move(tile_pos + right_dir)
+	if left_ok and not right_ok:
+		return left_dir
+	if right_ok and not left_ok:
+		return right_dir
+	return Vector2i.ZERO
 
 func _get_normal_direction(event: InputEvent) -> Vector2i:
 	if event.is_action_pressed("ui_up"):

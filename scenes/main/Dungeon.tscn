@@ -85,3 +85,61 @@ text = "中断する"
 layout_mode = 2
 custom_minimum_size = Vector2(0, 36)
 text = "やめる"
+
+[node name="FootPrompt" type="CanvasLayer" parent="."]
+process_mode = 3
+layer = 50
+visible = false
+
+[node name="Dim" type="ColorRect" parent="FootPrompt"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0, 0, 0, 0.55)
+mouse_filter = 0
+
+[node name="Panel" type="Panel" parent="FootPrompt"]
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -240.0
+offset_top = -130.0
+offset_right = 240.0
+offset_bottom = 130.0
+
+[node name="Margin" type="MarginContainer" parent="FootPrompt/Panel"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+theme_override_constants/margin_left = 24
+theme_override_constants/margin_top = 24
+theme_override_constants/margin_right = 24
+theme_override_constants/margin_bottom = 24
+
+[node name="VBox" type="VBoxContainer" parent="FootPrompt/Panel/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 14
+
+[node name="MessageLabel" type="Label" parent="FootPrompt/Panel/Margin/VBox"]
+layout_mode = 2
+horizontal_alignment = 1
+autowrap_mode = 2
+text = "アイテムが落ちている。"
+
+[node name="Buttons" type="VBoxContainer" parent="FootPrompt/Panel/Margin/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="PickupButton" type="Button" parent="FootPrompt/Panel/Margin/VBox/Buttons"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 36)
+text = "拾う"
+
+[node name="ThrowButton" type="Button" parent="FootPrompt/Panel/Margin/VBox/Buttons"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 36)
+text = "投げる"
+
+[node name="FootCancelButton" type="Button" parent="FootPrompt/Panel/Margin/VBox/Buttons"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 36)
+text = "そのまま"
