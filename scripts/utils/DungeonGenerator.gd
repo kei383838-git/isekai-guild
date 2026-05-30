@@ -213,6 +213,8 @@ func _uf_find(parent: Array, x: int) -> int:
 # 水平接続：左部屋 a と右部屋 b を Z 字（水平→垂直→水平）で結ぶ。
 # 中継 x（mid_x）を 2 部屋の間でランダムに選び、部屋 a の右辺〜mid_x を y_a で、
 # mid_x で縦に折れて y_b に合わせ、mid_x〜部屋 b の左辺を y_b で水平に引く。
+# mid_x は両部屋から最低 1 マスの壁マージンを残すよう範囲を絞る。
+# これにより通路の縦セグメントが部屋の縁と並走（敵 AI 判定が混乱する原因）するのを防ぐ。
 func _draw_h_corridor(a_in: Rect2i, b_in: Rect2i, room_cells: Dictionary, floor_cells: Array) -> void:
 	var a: Rect2i = a_in
 	var b: Rect2i = b_in
@@ -222,8 +224,12 @@ func _draw_h_corridor(a_in: Rect2i, b_in: Rect2i, room_cells: Dictionary, floor_
 		b = tmp
 	var y_a = randi_range(a.position.y, a.end.y - 1)
 	var y_b = randi_range(b.position.y, b.end.y - 1)
-	var mid_lo: int = a.end.x
-	var mid_hi: int = b.position.x - 1
+	# 部屋から 1 マス離した範囲を優先。範囲が取れない近接ケースは元の範囲にフォールバック。
+	var mid_lo: int = a.end.x + 1
+	var mid_hi: int = b.position.x - 2
+	if mid_lo > mid_hi:
+		mid_lo = a.end.x
+		mid_hi = b.position.x - 1
 	var mid_x: int = mid_lo if mid_lo >= mid_hi else randi_range(mid_lo, mid_hi)
 
 	# 水平 1：a の右壁 → mid_x
@@ -239,6 +245,7 @@ func _draw_h_corridor(a_in: Rect2i, b_in: Rect2i, room_cells: Dictionary, floor_
 		_set_corridor(Vector2i(x, y_b), room_cells, floor_cells)
 
 # 垂直接続：上部屋 a と下部屋 b を Z 字（垂直→水平→垂直）で結ぶ。
+# mid_y は両部屋から最低 1 マスの壁マージンを残すよう範囲を絞る（水平接続と同じ理由）。
 func _draw_v_corridor(a_in: Rect2i, b_in: Rect2i, room_cells: Dictionary, floor_cells: Array) -> void:
 	var a: Rect2i = a_in
 	var b: Rect2i = b_in
@@ -248,8 +255,12 @@ func _draw_v_corridor(a_in: Rect2i, b_in: Rect2i, room_cells: Dictionary, floor_
 		b = tmp
 	var x_a = randi_range(a.position.x, a.end.x - 1)
 	var x_b = randi_range(b.position.x, b.end.x - 1)
-	var mid_lo: int = a.end.y
-	var mid_hi: int = b.position.y - 1
+	# 部屋から 1 マス離した範囲を優先。近接ケースは元の範囲にフォールバック。
+	var mid_lo: int = a.end.y + 1
+	var mid_hi: int = b.position.y - 2
+	if mid_lo > mid_hi:
+		mid_lo = a.end.y
+		mid_hi = b.position.y - 1
 	var mid_y: int = mid_lo if mid_lo >= mid_hi else randi_range(mid_lo, mid_hi)
 
 	for y in range(a.end.y, mid_y + 1):
