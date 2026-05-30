@@ -570,7 +570,10 @@ func _dash(direction: Vector2i) -> void:
 		move(step_dir, false)
 		current_dir = step_dir
 		was_in_room = next_in_room
-		TurnManager.advance_turn()
+		# 1 ターン進めて敵ターンの完了を待つ（_advance_and_wait_turn 参照）。
+		await _advance_and_wait_turn()
+		if not is_inside_tree():
+			return
 
 		if stop_after:
 			break
@@ -602,6 +605,19 @@ func _dash(direction: Vector2i) -> void:
 		var foot_item: Node = _item_at_tile(tile_pos)
 		if foot_item != null:
 			dash_ended_on_item.emit(foot_item)
+
+# 1 ターン進めて、敵ターンが終わるまで待つ共通ヘルパ。
+# TurnManager.advance_turn() は内部の execute_enemy_turns が await を含む
+# コルーチンのため、呼び出した瞬間には敵の行動は完了していない。
+# turn_cycle_completed を await することで、敵全員の行動と各種イベントが
+# 終わってから次の処理に進めるようにする。
+# ダッシュ / 長押し待機 / オート探索など、入力なしで連続でターンを
+# 進めるアクションは必ずこのヘルパを通すこと（直接 advance_turn を呼ぶと
+# 「敵の行動を踏み越えて連続でダメージを食らう」バグになる）。
+func _advance_and_wait_turn() -> void:
+	TurnManager.advance_turn()
+	if is_inside_tree():
+		await TurnManager.turn_cycle_completed
 
 # ダッシュ中、tile_pos が部屋矩形のどれかに含まれるか
 func _is_in_room(pos: Vector2i) -> bool:
