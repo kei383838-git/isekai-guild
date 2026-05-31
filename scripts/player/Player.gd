@@ -11,6 +11,9 @@ signal dash_ended_on_item(item_node: Node)
 
 const TILE_SIZE: int = 64
 const DASH_MAX_STEPS := 20
+# 長押し待機（シレン式）の 1 ターンあたりの待ち時間。ダッシュと同じ 0.08 秒。
+# docs/system/combat.md §3.3。
+const WAIT_STEP_DELAY := 0.08
 
 # 投擲：射程と既定ダメージ。
 # 射程：壁 / 敵に当たるまで最大 10 マス（シレン系慣習）。
@@ -47,6 +50,8 @@ var rooms: Array[Rect2i] = []
 var stair_tile: Vector2i = Vector2i(-1, -1)
 var _step: int = 1
 var _is_dashing: bool = false
+# 長押し待機ループ中フラグ。ダッシュの _is_dashing と同様、ループ中は他の入力を無視する。
+var _is_waiting: bool = false
 var _is_dead: bool = false
 var _mode: Mode = Mode.NORMAL
 var _turns_in_dungeon: int = 0
@@ -286,6 +291,39 @@ func wait_in_place() -> void:
 	_step = (_step + 1) % 2
 	sprite.frame_coords = Vector2i(_step * 2, facing)
 	get_tree().create_timer(0.3).timeout.connect(_show_idle, CONNECT_ONE_SHOT)
+
+# 長押し待機（シレン式）。wait アクションの押下で起動する。
+# - タップ（さっと離す）：最低 1 ターンだけ経過（従来の単発待機と同じ）
+# - 長押し：キーを押し続けている間、自動でターンを進め続ける
+# 停止条件（シレン本家準拠）：
+#   - キーを離した
+#   - 8 方向隣接に敵が現れた（_has_adjacent_enemy）
+#   - 視界内（同部屋 or 直線視線）に敵が入った（_enemy_in_view）
+#   - 死亡 / シーン切替（is_inside_tree が false）
+# 各ターンは _advance_and_wait_turn() を通して敵ターン完了まで待つ
+# （直接 advance_turn を連打すると敵の行動を踏み越えるバグになるため）。
+# docs/system/combat.md §3.3。
+func _wait_hold() -> void:
+	_is_waiting = true
+	while true:
+		# 停止判定より先に最低 1 ターンを必ず実行する。これで「タップ＝1 ターン」を
+		# 保証する（隣接に敵がいても単発待機は成立する＝その場で 1 ターン受ける）。
+		wait_in_place()
+		await _advance_and_wait_turn()
+		if not is_inside_tree() or _is_dead:
+			break
+		# 次ターンへ進む前に必ず 1 ステップ分待つ。敵がいないフロアでは
+		# _advance_and_wait_turn() が同期完了してフレームを跨がないため、ここで待たないと
+		# キーの離し（タップ）を検知できず、1 タップで 2 ターン進んでしまう。
+		await get_tree().create_timer(WAIT_STEP_DELAY).timeout
+		if not is_inside_tree() or _is_dead:
+			break
+		# 2 ターン目以降は「押し続けている かつ 停止条件なし」の間だけ継続する。
+		if not Input.is_action_pressed("wait"):
+			break
+		if _has_adjacent_enemy() or _enemy_in_view():
+			break
+	_is_waiting = false
 
 # facing 定数を Vector2i に変換する（_update_facing の逆）
 func _facing_to_vector() -> Vector2i:
@@ -616,7 +654,11 @@ func _dash(direction: Vector2i) -> void:
 # 「敵の行動を踏み越えて連続でダメージを食らう」バグになる）。
 func _advance_and_wait_turn() -> void:
 	TurnManager.advance_turn()
-	if is_inside_tree():
+	# 敵が 0 体のフロアでは execute_enemy_turns() が同期的に完走し、
+	# turn_cycle_completed はこの時点で既に emit 済み・is_player_turn は true に戻る。
+	# その状態で await すると「次サイクルまで永久に待つ」ハングになるため、
+	# 敵ターンがまだ進行中（is_player_turn == false）の時だけ完了を待つ。
+	if is_inside_tree() and not TurnManager.is_player_turn:
 		await TurnManager.turn_cycle_completed
 
 # ダッシュ中、tile_pos が部屋矩形のどれかに含まれるか
@@ -640,6 +682,49 @@ func _has_adjacent_enemy() -> bool:
 		if abs(d.x) <= 1 and abs(d.y) <= 1:
 			return true
 	return false
+
+# 視界内（同部屋 or 直線視線）に敵がいるか。長押し待機の停止判定に使う。
+# 規則は Enemy.gd の _is_player_visible と同じ（視界判定の正本は Enemy 側）。
+# rooms / floor_layer はダンジョン入場時に Dungeon から注入される。村では
+# rooms が空・floor_layer が null になるため常に false を返す（誤停止しない）。
+func _enemy_in_view() -> bool:
+	if not is_inside_tree():
+		return false
+	for e in get_tree().get_nodes_in_group("enemies"):
+		if not is_instance_valid(e):
+			continue
+		var e_tile: Vector2i = Vector2i(round(e.position.x / TILE_SIZE), round(e.position.y / TILE_SIZE))
+		if _in_same_room(tile_pos, e_tile) or _has_line_of_sight(tile_pos, e_tile):
+			return true
+	return false
+
+# 2 点が同じ部屋矩形に含まれるか
+func _in_same_room(a: Vector2i, b: Vector2i) -> bool:
+	for r in rooms:
+		if r.has_point(a) and r.has_point(b):
+			return true
+	return false
+
+# 水平・垂直・45°斜めに並んでいて、間のマスがすべて床なら true。
+# 通路の角越し・壁越しは false。Enemy.gd の _has_line_of_sight と同じ規則。
+func _has_line_of_sight(a: Vector2i, b: Vector2i) -> bool:
+	if floor_layer == null:
+		return false
+	var diff: Vector2i = b - a
+	var adx: int = abs(diff.x)
+	var ady: int = abs(diff.y)
+	if not (diff.x == 0 or diff.y == 0 or adx == ady):
+		return false
+	var steps: int = max(adx, ady)
+	if steps <= 1:
+		return true
+	var step_dir: Vector2i = Vector2i(sign(diff.x), sign(diff.y))
+	var cur: Vector2i = a + step_dir
+	for _i in range(steps - 1):
+		if floor_layer.get_cell_source_id(cur) == -1:
+			return false
+		cur += step_dir
+	return true
 
 # 指定タイルにあるアイテムノードを返す（無ければ null）
 func _item_at_tile(pos: Vector2i) -> Node:
@@ -746,12 +831,12 @@ func _get_diagonal_direction(event: InputEvent) -> Vector2i:
 	return Vector2i.ZERO
 
 func _unhandled_input(event: InputEvent) -> void:
-	if _is_dashing or _is_dead or not TurnManager.is_player_turn:
+	if _is_dashing or _is_waiting or _is_dead or not TurnManager.is_player_turn:
 		return
 
 	if event.is_action_pressed("wait"):
-		wait_in_place()
-		TurnManager.advance_turn()
+		# 長押し待機（シレン式）。タップ＝1 ターン、押し続けで連続待機。_wait_hold 参照。
+		_wait_hold()
 		return
 
 	if event.is_action_pressed("attack"):
