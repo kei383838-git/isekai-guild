@@ -19,11 +19,25 @@ extends Resource
 @export var room_size_max: int = 5
 
 @export_group("出現要素")
+# 種別ごとの出現テーブル（重み＋フロア帯）。フロア生成時の初期配置と探索中の追加発生で
+# 共通利用する。空の場合は enemy_scenes[0] を enemies_per_floor 体置く旧挙動にフォールバックする。
+@export var spawn_table: Array[EnemySpawnEntry] = []
+# 出現テーブルが空のときの基底敵シーン。種別ごとのシーン上書き
+# (scenes/enemy/monsters/<enemy_type>.tscn) が無い場合の生成元にも使う。
 @export var enemy_scenes: Array[String] = ["res://scenes/enemy/Enemy.tscn"]
+# フロア生成時に最初から配置する敵の数
 @export var enemies_per_floor: int = 3
 @export var item_types: Array[String] = ["herb"]
 @export var items_per_floor_min: int = 2
 @export var items_per_floor_max: int = 3
+
+@export_subgroup("追加発生")
+# 探索中の追加発生（シレンの「モンスター発生」相当）。docs/system/dungeon.md §7。
+@export var enable_continuous_spawn: bool = true
+# 何ターン経過ごとに 1 体湧くか（カウンタはフロアごとにリセットされる）
+@export var spawn_interval_turns: int = 12
+# フロア内に同時に存在できる敵の上限。これを超える間は追加発生しない
+@export var max_enemies_on_floor: int = 12
 
 @export_group("見た目")
 # 本素材の TileSet（指定があれば仮置きの単色塗りを上書きする）

@@ -74,7 +74,9 @@
 * `map_size`：マップサイズ（Vector2i）
 * `floor_count`：最大階層
 * `room_size_min` / `room_size_max`：部屋サイズの範囲
-* `enemies_per_floor` / `items_per_floor_*`：出現要素の数
+* `spawn_table` / `enemies_per_floor`：出現する敵の種別テーブルと初期配置数（[§7](#7-敵の出現)）
+* `enable_continuous_spawn` / `spawn_interval_turns` / `max_enemies_on_floor`：追加発生の設定（[§7.2](#72-追加発生モンスター発生)）
+* `items_per_floor_*`：床落ちアイテムの数
 * `difficulty`：難易度（ロスト率に影響、[loot_loss.md](loot_loss.md)）
 * `allow_return`：ESC 帰還を許可するか（高難易度ダンジョンは false）
 * `level_reset`：Lv1 リセット型かどうか（[leveling.md](leveling.md) §8）
@@ -89,3 +91,52 @@
 * **中断**：階段マスで「中断」→ 次の階の情報を `SaveManager` に保存してタイトルへ
 * **帰還**：`allow_return = true` なら ESC で帰還可能
 * **死亡**：所持品とゴールドを難易度ごとのロスト率で削減、クエスト失敗、村に運ばれる
+
+## 7. 敵の出現
+
+敵の種類と数は [DungeonConfig](../../scripts/systems/DungeonConfig.gd) と、種別ごとの
+[EnemyData](../../scripts/systems/EnemyData.gd)（`data/enemies/<enemy_type>.tres`）でデータ駆動する。
+`enemy_type` を与えれば HP / attack / defense / evasion / xp / スプライトが EnemyData から
+自動適用される（[Enemy.gd](../../scripts/enemy/Enemy.gd) の `_load_enemy_data`）。新しい敵種は
+`.tres` を 1 枚足すだけで増やせる。スプライト未投入の種別は `icon.svg` を `fallback_color` で
+着色した仮置きになる（画像が無くてもロジックが通る。[rules.md](../rules.md) / CLAUDE.md の画像方針）。
+ボス等の特殊敵は `scenes/enemy/monsters/<enemy_type>.tscn` を置けばシーンごと差し替えできる
+（ハイブリッド方式。[Dungeon.gd](../../scripts/main/Dungeon.gd) の `_instance_enemy`）。
+
+### 7.1 出現テーブル（種別と重み）
+
+`DungeonConfig.spawn_table` は [EnemySpawnEntry](../../scripts/systems/EnemySpawnEntry.gd) の配列で、
+各エントリは次を持つ：
+
+* `enemy_type`：`data/enemies/<enemy_type>.tres` と対応（クエストの `target_key` とも一致させる）
+* `weight`：出現比率（重み）
+* `min_floor` / `max_floor`：そのエントリが出現するフロア帯（両端含む）
+
+初期配置（フロア生成時）と追加発生（§7.2）の両方で、現在のフロアに該当するエントリから
+`weight` に比例して 1 体ずつ抽選する。フロア帯により「浅い階はスライム多め、深い階で新顔が
+出る」といった出し分けができる（例：goblin を `min_floor = 3` にすると 3 階から出る新顔になる）。
+
+`spawn_table` が空の場合は `enemy_scenes[0]`（既定 `Enemy.tscn`、`enemy_type` は "slime"）を
+`enemies_per_floor` 体置く旧挙動にフォールバックする。
+
+### 7.2 追加発生（モンスター発生）
+
+風来のシレンの「モンスター発生」に倣い、探索中もフロアに敵が湧き続ける。
+
+* `enable_continuous_spawn`：追加発生の有無
+* `spawn_interval_turns`：何ターン経過ごとに 1 体湧くか（カウンタはフロアごとにリセット）
+* `max_enemies_on_floor`：フロア内に同時存在できる敵数の上限（超える間は湧かない）
+
+発生位置は **プレイヤーから見えない床マス** に限る。具体的には次をすべて満たすマス：
+
+* プレイヤーと同じ部屋でなく、水平／垂直／45° の直線視線も通らない（[Player.is_tile_visible](../../scripts/player/Player.gd) を共用）
+* **カメラの可視範囲（画面内）にも入っていない**（[Dungeon.gd](../../scripts/main/Dungeon.gd) の `_is_on_screen`）。
+  プレイヤーが実際に見えるのは同室/直線視線より広く画面全体なので、これが無いと近くの通路や
+  隣室で「画面内ポップ」になってしまう
+
+適地が無いターンは見送り、次の間隔で再挑戦する。発生は **ログも演出も出さない**
+（画面外で静かに湧き、プレイヤーが進んで遭遇する）。
+
+実装上、追加発生は `TurnManager.turn_cycle_completed`（敵フェーズ完了後）で評価するため、
+`execute_enemy_turns()` の敵ループ中に敵数が変化することはない。湧いた敵は次のサイクルから
+[combat.md §9](combat.md#9-敵の行動) の AI で行動する。

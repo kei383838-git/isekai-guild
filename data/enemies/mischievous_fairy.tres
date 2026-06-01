@@ -1,10 +1,16 @@
-[gd_resource type="Resource" script_class="EnemyData" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="EnemyData" load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://scripts/systems/EnemyData.gd" id="1"]
+[ext_resource type="Texture2D" uid="uid://bh3cipd8ar0ar" path="res://assets/characters/enemies/mischievous_fairy_beginner_64.png" id="2"]
 
 [resource]
 script = ExtResource("1")
 enemy_type = "mischievous_fairy"
-xp = 10
+display_name = "いたずら妖精"
+max_hp = 16
+attack_power = 5
 defense = 0
-evasion = 0
+evasion = 20
+xp = 10
+sprite = ExtResource("2")
+fallback_color = Color(0.95, 0.6, 0.85, 1)

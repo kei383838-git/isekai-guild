@@ -97,8 +97,8 @@ func _ready():
 	# 初期向き
 	update_sprite_direction(Vector2.DOWN)
 
-# data/enemies/<enemy_type>.tres があれば読み込み、defense / evasion を反映する。
-# 未定義キーの場合は警告だけ出して既定値（0）のままにする。
+# data/enemies/<enemy_type>.tres があれば読み込み、HP / attack / defense / evasion /
+# スプライトを反映する。HP / attack の正本はデータ側（見つからなければ @export 既定値のまま）。
 func _load_enemy_data() -> void:
 	if enemy_type == "":
 		return
@@ -109,8 +109,34 @@ func _load_enemy_data() -> void:
 	data = load(path) as EnemyData
 	if data == null:
 		return
+	max_hp = data.max_hp
+	hp = data.max_hp
+	attack_power = data.attack_power
 	defense = data.defense
 	evasion = data.evasion
+	_apply_sprite()
+
+# EnemyData のスプライトを Sprite2D に適用する。
+# - data.sprite があれば 10x8 シートとして使用する
+# - data はあるがスプライト未投入の型は icon.svg を fallback_color で着色した仮置きにする
+#   （画像が無くてもロジックが通るようにする方針。CLAUDE.md「画像アセットの扱い」）
+# - data が解決できない場合（例: MonsterGallery が直接テクスチャを差し替えるケース）は
+#   既存テクスチャを尊重して何もしない
+func _apply_sprite() -> void:
+	if not sprite or data == null:
+		return
+	if data.sprite != null:
+		sprite.texture = data.sprite
+		sprite.hframes = 10
+		sprite.vframes = 8
+		sprite.frame = 0
+		sprite.modulate = Color.WHITE
+	else:
+		sprite.texture = load("res://icon.svg")
+		sprite.hframes = 1
+		sprite.vframes = 1
+		sprite.frame = 0
+		sprite.modulate = data.fallback_color
 
 # ワールド座標をグリッド座標（整数）に変換
 func get_grid_pos(pos: Vector2) -> Vector2i:
@@ -189,6 +215,10 @@ func _direction_to_8_direction_row(direction: Vector2) -> int:
 
 func set_anim_frame(column: int) -> void:
 	if not sprite:
+		return
+	# 仮置き（1x1 の icon.svg 等）など、アニメ列が足りないスプライトでは
+	# frame_coords が範囲外になりエラーになるため、その場合は何もしない。
+	if column >= sprite.hframes or facing_row >= sprite.vframes:
 		return
 	sprite.frame_coords = Vector2i(column, facing_row)
 

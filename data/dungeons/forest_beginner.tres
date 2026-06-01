@@ -1,8 +1,37 @@
-[gd_resource type="Resource" load_steps=4 format=3]
+[gd_resource type="Resource" script_class="DungeonConfig" load_steps=9 format=3]
 
 [ext_resource type="Script" path="res://scripts/systems/DungeonConfig.gd" id="1"]
 [ext_resource type="TileSet" path="res://assets/tilesets/dungeons/forest/forest_floor_tileset_v1.tres" id="2_floor"]
 [ext_resource type="TileSet" path="res://assets/tilesets/dungeons/forest/forest_wall_tileset_fill_hedge_gpt08_v4.tres" id="3_wall"]
+[ext_resource type="Script" path="res://scripts/systems/EnemySpawnEntry.gd" id="4_entry"]
+
+[sub_resource type="Resource" id="entry_slime"]
+script = ExtResource("4_entry")
+enemy_type = "slime"
+weight = 12
+min_floor = 1
+max_floor = 3
+
+[sub_resource type="Resource" id="entry_rabbit"]
+script = ExtResource("4_entry")
+enemy_type = "horned_rabbit"
+weight = 5
+min_floor = 1
+max_floor = 3
+
+[sub_resource type="Resource" id="entry_fairy"]
+script = ExtResource("4_entry")
+enemy_type = "mischievous_fairy"
+weight = 5
+min_floor = 2
+max_floor = 3
+
+[sub_resource type="Resource" id="entry_goblin"]
+script = ExtResource("4_entry")
+enemy_type = "goblin"
+weight = 6
+min_floor = 3
+max_floor = 3
 
 [resource]
 script = ExtResource("1")
@@ -16,10 +45,15 @@ room_count_min = 4
 room_count_max = 6
 room_size_min = 4
 room_size_max = 7
+spawn_table = Array[EnemySpawnEntry]([SubResource("entry_slime"), SubResource("entry_rabbit"), SubResource("entry_fairy"), SubResource("entry_goblin")])
+enemy_scenes = Array[String](["res://scenes/enemy/Enemy.tscn"])
 enemies_per_floor = 2
 item_types = Array[String](["herb", "wooden_sword", "wooden_shield", "talisman", "throw_stone"])
 items_per_floor_min = 2
 items_per_floor_max = 3
+enable_continuous_spawn = true
+spawn_interval_turns = 12
+max_enemies_on_floor = 12
 floor_tile_set = ExtResource("2_floor")
 wall_tile_set = ExtResource("3_wall")
 floor_source_id = 1

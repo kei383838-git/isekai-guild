@@ -8,6 +8,10 @@ extends Node2D
 const TILE_SIZE = 64
 const FALLBACK_CONFIG_PATH = "res://data/dungeons/forest_beginner.tres"
 
+# 追加発生を「画面外」と判定する際、カメラ可視矩形の外側に付ける余白（タイル数）。
+# 大きくするほど画面端から離れた位置にしか湧かなくなる。
+const SPAWN_SCREEN_MARGIN_TILES := 2
+
 @onready var floor_layer: TileMapLayer = $Floor
 @onready var wall_layer: TileMapLayer = $Wall
 @onready var background: ColorRect = $Background
@@ -34,6 +38,11 @@ var current_floor := 1
 var stair_pos := Vector2i(-1, -1)
 var stair_sprite: Sprite2D
 var is_transitioning := false
+
+# フロアの全床セル（追加発生の配置候補）。_generate_new_floor で更新する。
+var _floor_cells: Array = []
+# 追加発生用：このフロアに入ってからの経過ターン数（フロアごとにリセットする）。
+var _turns_since_spawn: int = 0
 
 # 階段プロンプト状態
 var _stair_prompt_open: bool = false
@@ -96,6 +105,8 @@ func _ready() -> void:
 		SaveManager.increment_attempt_count()
 
 	TurnManager.enemy_turn_started.connect(_on_player_action_finished)
+	# 探索中の追加発生（モンスター発生）。1 サイクル完了ごとに評価する。
+	TurnManager.turn_cycle_completed.connect(_on_turn_cycle_for_spawn)
 	if player.has_signal("died"):
 		player.died.connect(_on_player_died)
 	# ダッシュがアイテム上で終わった時だけ足元プロンプトを出す
@@ -179,19 +190,21 @@ func _generate_new_floor() -> void:
 
 	# マップ生成（config を渡してパラメータを反映）
 	var floor_cells = generator.generate(floor_layer, wall_layer, config)
+	# 追加発生の配置候補として全床セルを保持し、フロア開始でカウンタをリセットする
+	_floor_cells = floor_cells
+	_turns_since_spawn = 0
 
 	player.floor_layer = floor_layer
 	# ダッシュの停止判定で部屋/通路を区別するため部屋リストを渡す
 	# （階段位置はこのあと get_stair_pos で決めてから渡す）
 	player.rooms = generator.rooms_list
 
-	# 敵生成
+	# 敵生成（出現テーブルから種別を抽選してフロアに配置する）
 	var new_enemies: Array = []
-	var enemy_scene_path: String = config.enemy_scenes[0] if config.enemy_scenes.size() > 0 \
-		else "res://scenes/enemy/Enemy.tscn"
-	var enemy_scene = load(enemy_scene_path)
 	for i in range(config.enemies_per_floor):
-		var enemy = enemy_scene.instantiate()
+		var enemy = _instance_enemy(_pick_enemy_type())
+		if enemy == null:
+			continue
 		add_child(enemy)
 		enemy.floor_layer = floor_layer
 		# 敵 AI が「同じ部屋」を判定できるよう、生成済みの部屋リストを注入する。
@@ -236,6 +249,142 @@ func _generate_new_floor() -> void:
 			"%s F%d" % [config.display_name, current_floor])
 
 	get_tree().create_timer(0.5).timeout.connect(func(): is_transitioning = false)
+
+# --- 敵の出現（出現テーブル / 追加発生） ---
+# docs/system/dungeon.md §7。
+
+# 出現テーブルから、現在のフロアに出現可能な種別を重み付き抽選する。
+# テーブルが空 / 該当フロアのエントリが無い場合は "" を返し、呼び元で既定種別にフォールバックする。
+func _pick_enemy_type() -> String:
+	var pool: Array = []
+	var total: int = 0
+	for entry in config.spawn_table:
+		if entry == null or entry.weight <= 0:
+			continue
+		if current_floor < entry.min_floor or current_floor > entry.max_floor:
+			continue
+		pool.append(entry)
+		total += entry.weight
+	if pool.is_empty():
+		return ""
+	var r: int = randi() % total
+	for entry in pool:
+		r -= entry.weight
+		if r < 0:
+			return entry.enemy_type
+	return pool[0].enemy_type
+
+# 指定種別の敵インスタンスを生成する（ハイブリッド方式）。
+# - scenes/enemy/monsters/<type>.tscn があれば優先（ボス等の特殊敵向けのシーン上書き）
+# - 無ければ config.enemy_scenes[0]（既定 Enemy.tscn）を生成し enemy_type を設定する。
+#   見た目とステータスは Enemy._load_enemy_data() が EnemyData (.tres) から適用する。
+func _instance_enemy(type: String) -> Node:
+	if type != "":
+		var override_path := "res://scenes/enemy/monsters/%s.tscn" % type
+		if ResourceLoader.exists(override_path):
+			var packed: PackedScene = load(override_path)
+			if packed:
+				var inst = packed.instantiate()
+				if "enemy_type" in inst:
+					inst.enemy_type = type
+				return inst
+	var base_path: String = config.enemy_scenes[0] if config.enemy_scenes.size() > 0 \
+		else "res://scenes/enemy/Enemy.tscn"
+	var base_scene = load(base_path)
+	if base_scene == null:
+		return null
+	var enemy = base_scene.instantiate()
+	if type != "" and "enemy_type" in enemy:
+		enemy.enemy_type = type
+	return enemy
+
+# 1 ターンサイクル完了ごとに呼ばれ、一定間隔でフロアに敵を 1 体追加する。
+# turn_cycle_completed は敵フェーズ完了後（プレイヤーターン頭）に発火するため、
+# TurnManager.execute_enemy_turns() のループ中に敵数が変わることはない。
+func _on_turn_cycle_for_spawn() -> void:
+	if is_transitioning or not config.enable_continuous_spawn:
+		return
+	if config.spawn_interval_turns <= 0:
+		return
+	_turns_since_spawn += 1
+	if _turns_since_spawn < config.spawn_interval_turns:
+		return
+	_turns_since_spawn = 0
+	if _alive_enemy_count() >= config.max_enemies_on_floor:
+		return
+	_spawn_wandering_enemy()
+
+func _alive_enemy_count() -> int:
+	var n: int = 0
+	for e in get_tree().get_nodes_in_group("enemies"):
+		if is_instance_valid(e):
+			n += 1
+	return n
+
+# 追加発生の本体。プレイヤーの視界外（=同じ部屋でなく直線視線も通らない）の床に 1 体湧かせる。
+# 適地が無ければ今回は見送る（次の間隔で再挑戦）。
+func _spawn_wandering_enemy() -> void:
+	var cell := _find_offscreen_spawn_cell()
+	if cell == Vector2i(-1, -1):
+		return
+	var enemy = _instance_enemy(_pick_enemy_type())
+	if enemy == null:
+		return
+	add_child(enemy)
+	enemy.floor_layer = floor_layer
+	enemy.rooms = generator.rooms_list
+	enemy.position = Vector2(cell * TILE_SIZE)
+
+# プレイヤーの視界外（部屋外かつ直線視線外）で、誰も居ない床セルをランダムに 1 つ返す。
+# 見つからなければ Vector2i(-1, -1) を返す。
+func _find_offscreen_spawn_cell() -> Vector2i:
+	if _floor_cells.is_empty():
+		return Vector2i(-1, -1)
+	var occupied: Dictionary = {}
+	occupied[player.tile_pos] = true
+	occupied[stair_pos] = true
+	for e in get_tree().get_nodes_in_group("enemies"):
+		if is_instance_valid(e):
+			occupied[e.get_grid_pos(e.position)] = true
+	var candidates: Array = _floor_cells.duplicate()
+	candidates.shuffle()
+	for cell in candidates:
+		if occupied.has(cell):
+			continue
+		# 「同じ部屋 or 直線視線」を除外（部屋外かつ視線外）。
+		if player.has_method("is_tile_visible") and player.is_tile_visible(cell):
+			continue
+		# さらにカメラの可視範囲（画面内）も除外する。プレイヤーが実際に見えるのは
+		# AI 用の同室/直線視線より広く「画面全体」なので、これが無いと近くの通路や
+		# 隣室で画面内ポップになる（実際に発生したバグ）。
+		if _is_on_screen(cell):
+			continue
+		return cell
+	return Vector2i(-1, -1)
+
+# 追加発生の候補マスがカメラの可視範囲（画面内）に入っているか。
+# プレイヤーが実際に見えるのは同室/直線視線より広い「画面全体」なので、ここで除外して
+# 画面内に敵がポップするのを防ぐ。SPAWN_SCREEN_MARGIN_TILES 分の余白を付け、
+# カメラが取れない時は false を返す。
+func _is_on_screen(cell: Vector2i) -> bool:
+	var cam := _player_camera()
+	if cam == null:
+		return false
+	var view_size: Vector2 = get_viewport().get_visible_rect().size / cam.zoom
+	var margin := Vector2(TILE_SIZE, TILE_SIZE) * SPAWN_SCREEN_MARGIN_TILES
+	var center: Vector2 = cam.get_screen_center_position()
+	var rect := Rect2(center - view_size * 0.5 - margin, view_size + margin * 2.0)
+	var cell_world: Vector2 = Vector2(cell) * float(TILE_SIZE) + Vector2(TILE_SIZE, TILE_SIZE) * 0.5
+	return rect.has_point(cell_world)
+
+func _player_camera() -> Camera2D:
+	var cam := get_viewport().get_camera_2d()
+	if cam != null:
+		return cam
+	for c in player.get_children():
+		if c is Camera2D:
+			return c
+	return null
 
 func _on_player_action_finished() -> void:
 	if is_transitioning or _stair_prompt_open or _foot_prompt_open:

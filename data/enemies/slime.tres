@@ -1,10 +1,16 @@
-[gd_resource type="Resource" script_class="EnemyData" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="EnemyData" load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://scripts/systems/EnemyData.gd" id="1"]
+[ext_resource type="Texture2D" uid="uid://d0f40blqshtnn" path="res://assets/characters/enemies/slime_beginner_64.png" id="2"]
 
 [resource]
 script = ExtResource("1")
 enemy_type = "slime"
-xp = 3
+display_name = "スライム"
+max_hp = 15
+attack_power = 4
 defense = 0
 evasion = 0
+xp = 3
+sprite = ExtResource("2")
+fallback_color = Color(0.4, 0.8, 0.6, 1)

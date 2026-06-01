@@ -698,6 +698,11 @@ func _enemy_in_view() -> bool:
 			return true
 	return false
 
+# 指定タイルがプレイヤーから見えているか（同じ部屋 or 直線視線）。視界規則は _enemy_in_view と同一。
+# Dungeon の追加発生で「視界内に湧かせない」判定に使う。
+func is_tile_visible(t: Vector2i) -> bool:
+	return _in_same_room(tile_pos, t) or _has_line_of_sight(tile_pos, t)
+
 # 2 点が同じ部屋矩形に含まれるか
 func _in_same_room(a: Vector2i, b: Vector2i) -> bool:
 	for r in rooms:

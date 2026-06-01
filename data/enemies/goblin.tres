@@ -1,10 +1,16 @@
-[gd_resource type="Resource" script_class="EnemyData" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="EnemyData" load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://scripts/systems/EnemyData.gd" id="1"]
+[ext_resource type="Texture2D" uid="uid://b00qalxvrod1m" path="res://assets/characters/enemies/goblin_beginner_64.png" id="2"]
 
 [resource]
 script = ExtResource("1")
 enemy_type = "goblin"
-xp = 7
+display_name = "ゴブリン"
+max_hp = 26
+attack_power = 9
 defense = 0
 evasion = 0
+xp = 7
+sprite = ExtResource("2")
+fallback_color = Color(0.5, 0.7, 0.35, 1)
